@@ -7,145 +7,207 @@
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
 <style>
-:root{--bg:#0f0f0f;--bg2:#1a1a1a;--bg3:#252525;--bd:#333;--tx:#e8e8e8;--mt:#888;
---ok:#1D9E75;--wn:#EF9F27;--cr:#E24B4A;--in:#378ADD;--ac:#5DCAA5;}
+:root{
+ --bg:#0e0f11;--bg2:#17191c;--bg3:#20232700;--panel:#16181b;--bd:#2a2e33;--bd2:#333940;
+ --tx:#e9ecef;--mt:#8b929b;--mt2:#6b727b;
+ --ok:#25a97e;--wn:#e79a2b;--cr:#e05252;--in:#3d8fe0;--ac:#5DCAA5;
+ --r:12px;--sh:0 1px 0 rgba(255,255,255,.02) inset,0 2px 8px rgba(0,0,0,.25);
+}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:16px;max-width:1100px;margin:0 auto;}
-h1{font-size:19px;font-weight:500;margin-bottom:4px;}
-h2{font-size:11px;font-weight:600;color:var(--mt);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em;}
-.meta{font-size:12px;color:var(--mt);margin-bottom:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--mt);display:inline-block;transition:background .3s;}
-.dot.live{background:var(--ok);}.dot.err{background:var(--cr);}
-.pnl{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:12px;}
-.card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px;}
-.lbl{font-size:11px;color:var(--mt);margin-bottom:6px;}
-.val{font-size:24px;font-weight:500;line-height:1;}
-.unit{font-size:12px;color:var(--mt);margin-left:2px;}
-.note{font-size:11px;margin-top:5px;color:var(--mt);}
-.badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;}
-.b-auto{background:#0a2e20;color:var(--ok);}.b-fallback{background:#2e1a00;color:var(--wn);}
-.b-manual{background:#0a1a2e;color:var(--in);}.b-standby{background:#2a2a2a;color:var(--mt);}
-button{background:var(--bg3);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 15px;cursor:pointer;font-size:13px;margin:3px;}
-button:hover{border-color:var(--ac);}
-button:disabled{opacity:.4;cursor:not-allowed;}
-.btn-ok{border-color:var(--ok);color:var(--ok);}.btn-danger{border-color:var(--cr);color:var(--cr);}
-input,select{background:var(--bg3);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;font-size:13px;}
-input:focus{outline:none;border-color:var(--ac);}
-input.changed{border-color:var(--wn);}
-.conn-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;}
+body{font-family:system-ui,-apple-system,sans-serif;background:
+ radial-gradient(1200px 600px at 80% -10%,#14201b 0%,transparent 55%),var(--bg);
+ color:var(--tx);padding:20px 16px 40px;max-width:1120px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+
+/* ── En-tête ── */
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+.brand h1{font-size:20px;font-weight:600;letter-spacing:-.01em;}
+.brand p{font-size:12px;color:var(--mt);margin-top:2px;}
+.status{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--bd);
+ border-radius:999px;padding:6px 12px;font-size:12px;color:var(--mt);}
+.chip strong{color:var(--tx);font-weight:600;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mt2);transition:background .3s,box-shadow .3s;}
+.dot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(37,169,126,.18);}
+.dot.err{background:var(--cr);box-shadow:0 0 0 3px rgba(224,82,82,.18);}
+.badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:600;}
+.b-auto{background:#0c2b20;color:var(--ok);}.b-fallback{background:#2e1e05;color:var(--wn);}
+.b-manual{background:#0c1e33;color:var(--in);}.b-standby{background:#24282d;color:var(--mt);}
+
+/* ── Sections ── */
+section{background:var(--panel);border:1px solid var(--bd);border-radius:var(--r);
+ padding:16px;margin-bottom:14px;box-shadow:var(--sh);}
+.sec-title{font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.08em;
+ margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.sec-title .fill{flex:1;height:1px;background:linear-gradient(90deg,var(--bd),transparent);}
+.sec-title .aside{text-transform:none;letter-spacing:0;font-weight:500;color:var(--mt2);}
+
+/* ── Télémétrie ── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:13px 14px;transition:border-color .2s;}
+.card:hover{border-color:var(--bd2);}
+.lbl{font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.val{font-size:26px;font-weight:600;line-height:1;letter-spacing:-.02em;}
+.unit{font-size:12px;color:var(--mt);margin-left:3px;font-weight:400;}
+.note{font-size:11px;margin-top:6px;color:var(--mt);}
+.pill{display:inline-block;padding:3px 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--bg3);border:1px solid var(--bd2);color:var(--mt);}
+.pill.on{background:#0c2b20;border-color:transparent;color:var(--ok);}
+
+/* ── Connexion ── */
+.conn-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;}
 @media(max-width:700px){.conn-grid{grid-template-columns:1fr 1fr;}}
-.field{display:flex;flex-direction:column;gap:4px;}
+.field{display:flex;flex-direction:column;gap:5px;}
 .field label{font-size:11px;color:var(--mt);}
-.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
-.sp-item label{font-size:11px;color:var(--mt);display:block;margin-bottom:3px;}
+.sub{margin-top:10px;font-size:11px;color:var(--mt);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+
+/* ── Contrôles ── */
+input,select{background:#0f1113;color:var(--tx);border:1px solid var(--bd2);border-radius:8px;
+ padding:8px 10px;font-size:13px;transition:border-color .15s;font-family:inherit;}
+input:focus{outline:none;border-color:var(--ac);}
+input.changed{border-color:var(--wn);background:#1a1608;}
+button{background:var(--bg2);color:var(--tx);border:1px solid var(--bd2);border-radius:8px;
+ padding:8px 15px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;font-family:inherit;}
+button:hover:not(:disabled){border-color:var(--ac);background:#1c1f22;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+.btn-ok{border-color:var(--ok);color:var(--ok);}
+.btn-danger{border-color:var(--cr);color:var(--cr);}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+.divider{width:1px;height:22px;background:var(--bd);margin:0 3px;}
+.hint{font-size:11px;color:var(--wn);margin-top:12px;display:flex;gap:6px;align-items:flex-start;}
+
+/* ── Setpoints ── */
+details{margin-bottom:9px;background:#131518;border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
+details[open]{border-color:var(--bd2);}
+details summary{cursor:pointer;padding:12px 14px;font-size:13px;font-weight:500;color:var(--tx);
+ user-select:none;list-style:none;display:flex;align-items:center;gap:9px;}
+details summary::-webkit-details-marker{display:none;}
+details summary::before{content:'';width:6px;height:6px;border-right:2px solid var(--ac);border-bottom:2px solid var(--ac);
+ transform:rotate(-45deg);transition:transform .2s;margin-left:2px;}
+details[open] summary::before{transform:rotate(45deg);}
+details .inner{padding:2px 14px 16px;}
+.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px;}
+.sp-item label{font-size:11px;color:var(--mt);display:block;margin-bottom:5px;line-height:1.3;}
 .sp-item input{width:100%;}
-.sp-item .u{font-size:10px;color:var(--mt);margin-left:4px;}
-details{margin-bottom:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;}
-details summary{cursor:pointer;padding:11px 14px;font-size:13px;color:var(--ac);user-select:none;}
-details .inner{padding:4px 14px 14px;}
-.bwrap{height:12px;background:var(--bg3);border-radius:6px;overflow:hidden;margin:10px 0 6px;}
-.bar{height:100%;border-radius:6px;background:var(--ok);width:0;transition:width .2s;}
-#log{font-family:ui-monospace,monospace;font-size:11px;color:var(--mt);background:var(--bg3);border-radius:8px;padding:10px;max-height:160px;overflow-y:auto;white-space:pre-wrap;}
-.pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:500;background:var(--bg3);color:var(--mt);}
-.pill.on{background:#0a2e20;color:var(--ok);}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-footer{font-size:11px;color:var(--mt);margin-top:16px;text-align:center;}
-input[type=range]{accent-color:var(--ac);padding:0;}
+.sp-item .u{font-size:10px;color:var(--mt2);margin-left:4px;}
+
+/* ── OTA ── */
+.bwrap{height:10px;background:#0f1113;border:1px solid var(--bd);border-radius:999px;overflow:hidden;margin:12px 0 8px;}
+.bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ok),var(--ac));width:0;transition:width .2s;}
+
+/* ── Journal ── */
+#log{font-family:ui-monospace,'SF Mono',monospace;font-size:11px;color:var(--mt);background:#0f1113;
+ border:1px solid var(--bd);border-radius:8px;padding:12px;max-height:170px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
+
+footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-height:1.6;}
+input[type=range]{accent-color:var(--ac);padding:0;border:none;background:none;}
+input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 </style>
 </head>
 <body>
 
-<h1>Serre VGH — Contrôle à distance</h1>
-<div class="meta">
-  <span><span class="dot" id="dot-web"></span> Site : <span id="st-web">déconnecté</span></span>
-  <span><span class="dot" id="dot-esp"></span> ESP32 : <span id="st-esp">inconnu</span></span>
-  <span>Mode : <span id="sysmode" class="badge b-standby">--</span></span>
-  <span>Saison : <strong id="season" style="color:var(--ac)">--</strong></span>
-  <span id="lastseen"></span>
-</div>
+<!-- ═══ EN-TÊTE ═══ -->
+<header>
+  <div class="brand">
+    <h1>Serre VGH</h1>
+    <p>Contrôle à distance · liaison chiffrée TLS via MQTT · <a href="/historique.html" style="color:var(--ac);text-decoration:none">Historique →</a></p>
+  </div>
+  <div class="status">
+    <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
+    <span class="chip"><span class="dot" id="dot-esp"></span>ESP32&nbsp;<strong id="st-esp">inconnu</strong></span>
+    <span class="chip">Mode <span id="sysmode" class="badge b-standby">--</span></span>
+    <span class="chip">Saison&nbsp;<strong id="season" style="color:var(--ac)">--</strong></span>
+    <span class="chip" id="lastseen" style="display:none"></span>
+  </div>
+</header>
 
 <!-- ═══ CONNEXION BROKER ═══ -->
-<div class="pnl">
-  <h2>Connexion au broker MQTT (HiveMQ Cloud)</h2>
+<section>
+  <div class="sec-title">Connexion au broker MQTT <span class="fill"></span><span class="aside">HiveMQ Cloud</span></div>
   <div class="conn-grid">
     <div class="field"><label>Cluster (ex. abc123.s1.eu.hivemq.cloud)</label><input id="c-host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud"></div>
     <div class="field"><label>Utilisateur</label><input id="c-user" placeholder="vgh-web"></div>
     <div class="field"><label>Mot de passe</label><input id="c-pass" type="password"></div>
     <button class="btn-ok" id="btn-conn" onclick="toggleConn()">Se connecter</button>
   </div>
-  <div style="margin-top:8px;font-size:11px;color:var(--mt)">
-    Topic de base : <input id="c-base" value="vgh/gh1" style="width:110px;padding:3px 6px;font-size:11px">
+  <div class="sub">
+    Topic de base <input id="c-base" value="vgh/gh1" style="width:110px;padding:4px 8px;font-size:11px">
     — identifiants mémorisés dans ce navigateur uniquement.
   </div>
-</div>
+</section>
 
 <!-- ═══ TÉLÉMÉTRIE ═══ -->
-<div class="grid" id="tiles">
-  <div class="card"><div class="lbl">Temp air</div><div><span class="val" id="v-temp">--</span><span class="unit">°C</span></div><div class="note" id="n-temp">--</div></div>
-  <div class="card"><div class="lbl">Humidité</div><div><span class="val" id="v-rh">--</span><span class="unit">%</span></div><div class="note" id="n-rh">--</div></div>
-  <div class="card"><div class="lbl">Temp feuille</div><div><span class="val" id="v-leaf">--</span><span class="unit">°C</span></div><div class="note">MLX90614</div></div>
-  <div class="card"><div class="lbl">Delta feuille</div><div><span class="val" id="v-delta">--</span><span class="unit">°C</span></div><div class="note">feuille − air</div></div>
-  <div class="card"><div class="lbl">Point rosée</div><div><span class="val" id="v-dew">--</span><span class="unit">°C</span></div><div class="note" id="n-dew">--</div></div>
-  <div class="card"><div class="lbl">VPD</div><div><span class="val" id="v-vpd">--</span><span class="unit">kPa</span></div><div class="note" id="n-vpd">--</div></div>
-  <div class="card"><div class="lbl">Lux</div><div><span class="val" id="v-lux">--</span></div><div class="note" id="n-lux">--</div></div>
-  <div class="card"><div class="lbl">UV index</div><div><span class="val" id="v-uv">--</span></div><div class="note">ML8511</div></div>
-  <div class="card"><div class="lbl">Canopée max</div><div><span class="val" id="v-amg">--</span><span class="unit">°C</span></div><div class="note" id="n-amg">AMG moy --</div></div>
-  <div class="card"><div class="lbl">Ventilateurs</div><div><span class="val" id="v-fan">--</span><span class="unit">%</span></div><div class="note" id="n-fan">PWM --/255</div></div>
-  <div class="card"><div class="lbl">Vanne brumisation</div><div><span class="pill" id="p-valve">--</span></div><div class="note" id="n-valve">--</div></div>
-  <div class="card"><div class="lbl">Budget H₂O</div><div><span class="val" id="v-water">--</span><span class="unit">%</span></div><div class="note" id="n-water">--</div></div>
-  <div class="card"><div class="lbl">Uptime</div><div><span class="val" id="v-up" style="font-size:18px">--</span></div><div class="note" id="n-health">SD -- · RTC --</div></div>
-</div>
+<section>
+  <div class="sec-title">Télémétrie en direct <span class="fill"></span><span class="aside">rafraîchie toutes les 5 s</span></div>
+  <div class="grid" id="tiles">
+    <div class="card"><div class="lbl">Temp air</div><div><span class="val" id="v-temp">--</span><span class="unit">°C</span></div><div class="note" id="n-temp">--</div></div>
+    <div class="card"><div class="lbl">Humidité</div><div><span class="val" id="v-rh">--</span><span class="unit">%</span></div><div class="note" id="n-rh">--</div></div>
+    <div class="card"><div class="lbl">Temp feuille</div><div><span class="val" id="v-leaf">--</span><span class="unit">°C</span></div><div class="note">MLX90614</div></div>
+    <div class="card"><div class="lbl">Delta feuille</div><div><span class="val" id="v-delta">--</span><span class="unit">°C</span></div><div class="note">feuille − air</div></div>
+    <div class="card"><div class="lbl">Point rosée</div><div><span class="val" id="v-dew">--</span><span class="unit">°C</span></div><div class="note" id="n-dew">--</div></div>
+    <div class="card"><div class="lbl">VPD</div><div><span class="val" id="v-vpd">--</span><span class="unit">kPa</span></div><div class="note" id="n-vpd">--</div></div>
+    <div class="card"><div class="lbl">Lux</div><div><span class="val" id="v-lux">--</span></div><div class="note" id="n-lux">--</div></div>
+    <div class="card"><div class="lbl">UV index</div><div><span class="val" id="v-uv">--</span></div><div class="note">ML8511</div></div>
+    <div class="card"><div class="lbl">Canopée max</div><div><span class="val" id="v-amg">--</span><span class="unit">°C</span></div><div class="note" id="n-amg">AMG moy --</div></div>
+    <div class="card"><div class="lbl">Ventilateurs</div><div><span class="val" id="v-fan">--</span><span class="unit">%</span></div><div class="note" id="n-fan">PWM --/255</div></div>
+    <div class="card"><div class="lbl">Vanne brumisation</div><div><span class="pill" id="p-valve">--</span></div><div class="note" id="n-valve">--</div></div>
+    <div class="card"><div class="lbl">Budget H₂O</div><div><span class="val" id="v-water">--</span><span class="unit">%</span></div><div class="note" id="n-water">--</div></div>
+    <div class="card"><div class="lbl">Uptime</div><div><span class="val" id="v-up" style="font-size:19px">--</span></div><div class="note" id="n-health">SD -- · RTC --</div></div>
+  </div>
+</section>
 
 <!-- ═══ COMMANDES ═══ -->
-<div class="pnl">
-  <h2>Commandes</h2>
+<section>
+  <div class="sec-title">Commandes <span class="fill"></span></div>
   <div class="row">
     <button class="btn-ok" onclick="cmd({action:'resume'})">&#9654; Reprendre AUTO</button>
     <button onclick="cmd({action:'standby'})">&#9646;&#9646; Veille</button>
     <button class="btn-danger" onclick="if(confirm('Redémarrer l\'ESP32 ?'))cmd({action:'restart'})">&#8635; Redémarrer</button>
-    <span style="color:var(--mt);font-size:12px">Saison :</span>
+    <span class="divider"></span>
+    <span style="color:var(--mt);font-size:12px">Saison</span>
     <button onclick="cmd({action:'season',val:'HOT-DRY'})">HOT-DRY</button>
     <button onclick="cmd({action:'season',val:'HOT-WET'})">HOT-WET</button>
     <button onclick="cmd({action:'season',val:'COOL'})">COOL</button>
   </div>
-  <div class="row" style="margin-top:10px">
-    <span style="color:var(--mt);font-size:12px">Manuel :</span>
+  <div class="row" style="margin-top:11px">
+    <span style="color:var(--mt);font-size:12px">Manuel</span>
     <label style="font-size:12px;color:var(--mt)">Fan <span id="fan-pct">50</span>%</label>
     <input type="range" id="fan-slider" min="0" max="100" value="50" style="width:160px" oninput="document.getElementById('fan-pct').textContent=this.value">
     <button onclick="cmd({action:'fan',val:Math.round(document.getElementById('fan-slider').value*2.55)})">Appliquer fan</button>
+    <span class="divider"></span>
     <button onclick="cmd({action:'valve',val:'open'})">Ouvrir vanne</button>
     <button onclick="cmd({action:'valve',val:'close'})">Fermer vanne</button>
   </div>
-  <div style="margin-top:8px;font-size:11px;color:var(--wn)">⚠ Une commande manuelle passe le système en mode MANUAL — cliquer « Reprendre AUTO » pour rendre la main à la régulation.</div>
-</div>
+  <div class="hint">⚠ Une commande manuelle passe le système en mode MANUAL — cliquer « Reprendre AUTO » pour rendre la main à la régulation.</div>
+</section>
 
 <!-- ═══ SETPOINTS ═══ -->
-<div class="pnl">
-  <h2>Paramètres (setpoints) — <span id="sp-status" style="text-transform:none">en attente de données…</span></h2>
+<section>
+  <div class="sec-title">Paramètres de régulation (setpoints) <span class="fill"></span><span class="aside" id="sp-status">en attente de données…</span></div>
   <div id="sp-groups"></div>
-  <div class="row" style="margin-top:10px">
+  <div class="row" style="margin-top:12px">
     <button class="btn-ok" id="btn-sp-send" onclick="sendSetpoints()" disabled>Envoyer les modifications (<span id="sp-count">0</span>)</button>
     <button onclick="cmd({action:'getSetpoints'})">Recharger depuis l'ESP32</button>
     <span style="font-size:11px;color:var(--mt)">Sauvegardés en flash (NVS), conservés après redémarrage. Un changement de saison réinitialise aux presets.</span>
   </div>
-</div>
+</section>
 
 <!-- ═══ OTA ═══ -->
-<div class="pnl">
-  <h2>Mise à jour du firmware (OTA)</h2>
+<section>
+  <div class="sec-title">Mise à jour du firmware <span class="fill"></span><span class="aside">OTA</span></div>
   <div class="row">
     <input type="file" id="ota-file" accept=".bin">
     <button class="btn-ok" id="btn-ota" onclick="otaStart()">Téléverser</button>
     <button class="btn-danger" id="btn-ota-abort" onclick="otaAbort()" disabled>Annuler</button>
   </div>
   <div class="bwrap"><div class="bar" id="ota-bar"></div></div>
-  <div style="font-size:12px" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build.</div>
-  <div style="margin-top:6px;font-size:11px;color:var(--wn)">⚠ Ne pas fermer cette page pendant le transfert. L'ESP32 vérifie le MD5 et redémarre automatiquement si tout est valide ; sinon il conserve l'ancien firmware.</div>
-</div>
+  <div style="font-size:12px;color:var(--mt)" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build.</div>
+  <div class="hint">⚠ Ne pas fermer cette page pendant le transfert. L'ESP32 vérifie le MD5 et redémarre si tout est valide ; sinon il conserve l'ancien firmware.</div>
+</section>
 
 <!-- ═══ JOURNAL ═══ -->
-<div class="pnl"><h2>Journal</h2><div id="log"></div></div>
+<section>
+  <div class="sec-title">Journal <span class="fill"></span></div>
+  <div id="log"></div>
+</section>
 
 <footer>Virtual Greenhouse — Light Kinetics · liaison chiffrée TLS via broker MQTT · aucune donnée ne transite par ce site</footer>
 
@@ -298,7 +360,7 @@ function onMessage(topic,payload){
 }
 
 function updateDash(d){
-  set('lastseen','Dernière donnée : '+new Date().toLocaleTimeString());
+  const ls=$('lastseen');ls.style.display='';ls.textContent='Dernière donnée '+new Date().toLocaleTimeString();
   const mb=$('sysmode');mb.textContent=d.sysMode||'--';mb.className='badge b-'+(d.sysMode?d.sysMode.toLowerCase():'standby');
   set('season',d.season||'--');
   set('v-temp',fnum(d.tempC,1),col(d.tempC,sp('fanTempHighC',34),sp('tempEmergencyC',41)));

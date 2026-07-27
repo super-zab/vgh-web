@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Serre VGH — Historique</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+ --bg:#0e0f11;--bg2:#17191c;--panel:#16181b;--bd:#2a2e33;--bd2:#333940;
+ --tx:#e9ecef;--mt:#8b929b;--mt2:#6b727b;
+ --ok:#25a97e;--wn:#e79a2b;--cr:#e05252;--in:#3d8fe0;--ac:#5DCAA5;--vi:#9b7fe0;
+ --r:12px;--sh:0 1px 0 rgba(255,255,255,.02) inset,0 2px 8px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,-apple-system,sans-serif;background:
+ radial-gradient(1200px 600px at 80% -10%,#14201b 0%,transparent 55%),var(--bg);
+ color:var(--tx);padding:20px 16px 40px;max-width:1120px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+.brand h1{font-size:20px;font-weight:600;letter-spacing:-.01em;}
+.brand p{font-size:12px;color:var(--mt);margin-top:2px;}
+a{color:var(--ac);text-decoration:none;}
+a:hover{text-decoration:underline;}
+section{background:var(--panel);border:1px solid var(--bd);border-radius:var(--r);
+ padding:16px;margin-bottom:14px;box-shadow:var(--sh);}
+.sec-title{font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.08em;
+ margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.sec-title .fill{flex:1;height:1px;background:linear-gradient(90deg,var(--bd),transparent);}
+.sec-title .aside{text-transform:none;letter-spacing:0;font-weight:500;color:var(--mt2);}
+button{background:#1d2024;color:var(--tx);border:1px solid var(--bd2);border-radius:7px;
+ padding:7px 14px;cursor:pointer;font-size:13px;font-family:inherit;transition:border-color .15s,background .15s;}
+button:hover{border-color:var(--ac);}
+button.on{background:#0c2b20;border-color:var(--ok);color:var(--ok);}
+button:disabled{opacity:.4;cursor:not-allowed;}
+input,select{background:#1d2024;color:var(--tx);border:1px solid var(--bd2);border-radius:7px;
+ padding:7px 9px;font-size:13px;font-family:inherit;}
+input:focus,select:focus{outline:none;border-color:var(--ac);}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11px;color:var(--mt);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;}
+.card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:13px 14px;}
+.lbl{font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.val{font-size:24px;font-weight:600;line-height:1;letter-spacing:-.02em;}
+.unit{font-size:12px;color:var(--mt);margin-left:3px;font-weight:400;}
+.note{font-size:11px;margin-top:6px;color:var(--mt);}
+.chart-wrap{position:relative;height:250px;margin-top:4px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;
+ padding:0 10px 8px;font-weight:700;border-bottom:1px solid var(--bd);}
+td{padding:8px 10px;border-bottom:1px solid #1e2125;vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td.time{color:var(--mt);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;}
+.t-command{background:#0c1e33;color:var(--in);}
+.t-setpoints{background:#2a1f3d;color:var(--vi);}
+.t-connection{background:#24282d;color:var(--mt);}
+.detail{color:var(--mt);font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;
+ word-break:break-word;line-height:1.5;}
+.detail b{color:var(--tx);font-weight:600;font-family:inherit;}
+.scroll{max-height:440px;overflow-y:auto;}
+.msg{font-size:13px;color:var(--mt);padding:18px 0;text-align:center;}
+.msg.err{color:var(--cr);}
+footer{font-size:11px;color:var(--mt2);margin-top:16px;text-align:center;}
+@media(max-width:600px){.chart-wrap{height:200px;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Serre VGH — Historique</h1>
+    <p>Données enregistrées en continu, même site fermé · <a href="/">← Contrôle en direct</a></p>
+  </div>
+</header>
+
+<!-- ═══ ACCÈS + PÉRIODE ═══ -->
+<section>
+  <div class="sec-title">Période <span class="fill"></span><span class="aside" id="reso">—</span></div>
+
+  <div class="row" style="margin-bottom:12px">
+    <button data-h="24">24 heures</button>
+    <button data-h="72">3 jours</button>
+    <button data-h="168">7 jours</button>
+    <button data-h="720">30 jours</button>
+    <button data-h="2160">3 mois</button>
+  </div>
+
+  <div class="row">
+    <div class="field"><label for="f-from">Du</label><input type="datetime-local" id="f-from"></div>
+    <div class="field"><label for="f-to">Au</label><input type="datetime-local" id="f-to"></div>
+    <div class="field"><label for="f-token">Jeton d'accès</label><input type="password" id="f-token" placeholder="VGH_API_TOKEN" style="width:150px"></div>
+    <div class="field"><label>&nbsp;</label><button id="b-load" class="on">Charger</button></div>
+    <div class="field"><label>&nbsp;</label><button id="b-csv">Export CSV mesures</button></div>
+    <div class="field"><label>&nbsp;</label><button id="b-csv-ev">Export CSV consignes</button></div>
+  </div>
+  <div class="msg" id="status" style="display:none"></div>
+</section>
+
+<!-- ═══ SYNTHÈSE ═══ -->
+<section id="s-summary" style="display:none">
+  <div class="sec-title">Synthèse de la période <span class="fill"></span><span class="aside" id="npoints"></span></div>
+  <div class="grid" id="summary"></div>
+</section>
+
+<!-- ═══ GRAPHIQUES ═══ -->
+<section id="s-charts" style="display:none">
+  <div class="sec-title">Températures <span class="fill"></span><span class="aside">air · feuille · point de rosée</span></div>
+  <div class="chart-wrap"><canvas id="c-temp"></canvas></div>
+</section>
+
+<section id="s-charts2" style="display:none">
+  <div class="sec-title">Humidité &amp; VPD <span class="fill"></span><span class="aside">le VPD pilote la brumisation</span></div>
+  <div class="chart-wrap"><canvas id="c-vpd"></canvas></div>
+</section>
+
+<section id="s-charts3" style="display:none">
+  <div class="sec-title">Lumière <span class="fill"></span><span class="aside">lux · index UV</span></div>
+  <div class="chart-wrap"><canvas id="c-light"></canvas></div>
+</section>
+
+<section id="s-charts4" style="display:none">
+  <div class="sec-title">Régulation <span class="fill"></span><span class="aside">ventilation · vanne · budget eau</span></div>
+  <div class="chart-wrap"><canvas id="c-act"></canvas></div>
+</section>
+
+<!-- ═══ JOURNAL ═══ -->
+<section id="s-log" style="display:none">
+  <div class="sec-title">Consignes &amp; commandes <span class="fill"></span><span class="aside" id="nlog"></span></div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th style="width:150px">Horodatage</th><th style="width:110px">Type</th><th>Détail</th></tr></thead>
+      <tbody id="logbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>Serre VGH · les données restent disponibles indépendamment de l'état de la serre</footer>
+
+<script>
+'use strict';
+
+// ── Petits utilitaires ────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+const toLocalInput = (d) =>
+  `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtNum = (v, dp = 1) => (v === null || v === undefined) ? '—' : Number(v).toFixed(dp);
+
+// Le jeton est mémorisé dans le navigateur, comme les identifiants MQTT
+// du site principal.
+$('f-token').value = localStorage.getItem('vgh-api-token') || '';
+$('f-token').addEventListener('change', (e) =>
+  localStorage.setItem('vgh-api-token', e.target.value.trim()));
+
+function setRange(hours) {
+  const to = new Date();
+  $('f-to').value = toLocalInput(to);
+  $('f-from').value = toLocalInput(new Date(to.getTime() - hours * 3600e3));
+}
+setRange(24);
+
+document.querySelectorAll('button[data-h]').forEach((b) =>
+  b.addEventListener('click', () => { setRange(+b.dataset.h); load(); }));
+
+function params() {
+  const token = $('f-token').value.trim();
+  const from = new Date($('f-from').value).toISOString();
+  const to   = new Date($('f-to').value).toISOString();
+  return new URLSearchParams({ from, to, token });
+}
+
+function say(text, isErr) {
+  const el = $('status');
+  el.textContent = text;
+  el.className = 'msg' + (isErr ? ' err' : '');
+  el.style.display = text ? 'block' : 'none';
+}
+
+// ── Graphiques ────────────────────────────────────────────────────────
+Chart.defaults.color = '#8b929b';
+Chart.defaults.borderColor = '#242830';
+Chart.defaults.font.family = 'system-ui, -apple-system, sans-serif';
+Chart.defaults.font.size = 11;
+
+const charts = {};
+
+function draw(canvasId, labels, datasets, opts = {}) {
+  charts[canvasId]?.destroy();
+  charts[canvasId] = new Chart($(canvasId), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      elements: { point: { radius: 0, hitRadius: 12 }, line: { borderWidth: 1.6, tension: .25 } },
+      plugins: {
+        legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+        tooltip: { backgroundColor: '#1d2024', borderColor: '#333940', borderWidth: 1, padding: 10 },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, autoSkip: true, maxRotation: 0 } },
+        y: { grid: { color: '#1e2125' }, ...(opts.y || {}) },
+        ...(opts.y1 ? { y1: { position: 'right', grid: { display: false }, ...opts.y1 } } : {}),
+      },
+    },
+  });
+}
+
+const line = (label, data, color, yAxisID) => ({
+  label, data, borderColor: color, backgroundColor: color + '22',
+  yAxisID: yAxisID || 'y', spanGaps: true,
+});
+
+// ── Chargement ────────────────────────────────────────────────────────
+async function load() {
+  if (!$('f-token').value.trim()) { say('Renseigne le jeton d\'accès (variable VGH_API_TOKEN sur Vercel).', true); return; }
+  say('Chargement…');
+  $('b-load').disabled = true;
+
+  try {
+    const p = params();
+    const [hRes, eRes] = await Promise.all([
+      fetch('/api/history?' + p),
+      fetch('/api/events?' + p),
+    ]);
+    if (!hRes.ok) throw new Error((await hRes.json()).error || `Erreur ${hRes.status}`);
+    const hist = await hRes.json();
+    const events = eRes.ok ? await eRes.json() : { activity: [] };
+
+    if (!hist.rows.length) {
+      say('Aucune donnée sur cette période. Si le collecteur vient d\'être installé, laisse-lui quelques minutes.', false);
+      ['s-summary','s-charts','s-charts2','s-charts3','s-charts4','s-log']
+        .forEach((id) => $(id).style.display = 'none');
+      return;
+    }
+
+    say('');
+    render(hist);
+    renderLog(events.activity || []);
+
+  } catch (e) {
+    say(e.message, true);
+  } finally {
+    $('b-load').disabled = false;
+  }
+}
+
+function render(hist) {
+  const rows = hist.rows;
+  const hourly = hist.resolution === 'hourly';
+  $('reso').textContent = hourly
+    ? `${rows.length} points · moyennes horaires`
+    : `${rows.length} points · mesure par mesure`;
+  $('npoints').textContent = hourly ? 'moyennes horaires' : 'mesures brutes';
+
+  // Étiquettes : on omet la date quand la période tient dans une journée.
+  const span = new Date(rows.at(-1).ts) - new Date(rows[0].ts);
+  const labels = rows.map((r) => {
+    const d = new Date(r.ts);
+    return span > 36 * 3600e3
+      ? `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}h`
+      : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const col = (k) => rows.map((r) => r[k] === null || r[k] === undefined ? null : Number(r[k]));
+
+  // ── Synthèse ──
+  const agg = (k, fn) => {
+    const v = col(k).filter((x) => x !== null && !Number.isNaN(x));
+    if (!v.length) return null;
+    return fn === 'min' ? Math.min(...v) : fn === 'max' ? Math.max(...v)
+         : v.reduce((a, b) => a + b, 0) / v.length;
+  };
+  const cards = [
+    ['Temp. moyenne', fmtNum(agg('temp_c','avg')), '°C',
+      `min ${fmtNum(agg(hourly?'temp_min_c':'temp_c','min'))} · max ${fmtNum(agg(hourly?'temp_max_c':'temp_c','max'))}`],
+    ['Humidité moy.', fmtNum(agg('humidity','avg')), '%',
+      `min ${fmtNum(agg('humidity','min'))} · max ${fmtNum(agg('humidity','max'))}`],
+    ['VPD moyen', fmtNum(agg('vpd_kpa','avg'), 2), 'kPa',
+      `max ${fmtNum(agg(hourly?'vpd_max_kpa':'vpd_kpa','max'), 2)} kPa`],
+    ['Δ feuille moy.', fmtNum(agg('leaf_delta_c','avg')), '°C', 'feuille − air'],
+    ['Ventilation moy.', fmtNum(agg('fan_pct','avg'), 0), '%',
+      `max ${fmtNum(agg(hourly?'fan_max_pct':'fan_pct','max'), 0)} %`],
+    ['Lux max', fmtNum(agg(hourly?'lux_max':'lux','max'), 0), '',
+      `moyenne ${fmtNum(agg('lux','avg'), 0)}`],
+  ];
+  if (hourly) {
+    cards.push(['Vanne ouverte', fmtNum(agg('valve_open_pct','avg'), 1), '%', 'du temps']);
+  } else {
+    const open = rows.filter((r) => r.valve_reason === 'ACTIVE').length;
+    cards.push(['Vanne ouverte', fmtNum(open / rows.length * 100, 1), '%', `${open} mesures sur ${rows.length}`]);
+  }
+  $('summary').innerHTML = cards.map(([l, v, u, n]) =>
+    `<div class="card"><div class="lbl">${l}</div>
+     <div><span class="val">${v}</span><span class="unit">${u}</span></div>
+     <div class="note">${n}</div></div>`).join('');
+
+  // ── Courbes ──
+  draw('c-temp', labels, [
+    line('Air (°C)',           col('temp_c'),      '#e05252'),
+    line('Feuille (°C)',       col('leaf_temp_c'), '#e79a2b'),
+    line('Point de rosée (°C)',col('dew_point_c'), '#3d8fe0'),
+    line('Canopée max (°C)',   col('amg_max_c'),   '#9b7fe0'),
+  ]);
+
+  draw('c-vpd', labels, [
+    line('Humidité (%)', col('humidity'), '#3d8fe0'),
+    line('VPD (kPa)',    col('vpd_kpa'),  '#5DCAA5', 'y1'),
+  ], {
+    y:  { title: { display: true, text: 'Humidité (%)' }, min: 0, max: 100 },
+    y1: { title: { display: true, text: 'VPD (kPa)' }, min: 0 },
+  });
+
+  draw('c-light', labels, [
+    line('Lux',       col('lux'),      '#e79a2b'),
+    line('Index UV',  col('uv_index'), '#9b7fe0', 'y1'),
+  ], {
+    y:  { title: { display: true, text: 'Lux' }, min: 0 },
+    y1: { title: { display: true, text: 'UV' }, min: 0 },
+  });
+
+  const valveSeries = hourly
+    ? col('valve_open_pct')
+    : rows.map((r) => r.valve_reason === 'ACTIVE' ? 100 : 0);
+  draw('c-act', labels, [
+    line('Ventilateurs (%)', col('fan_pct'), '#25a97e'),
+    line('Vanne (%)',        valveSeries,    '#3d8fe0'),
+    line('Budget eau (%)',   col(hourly ? 'water_budget_min_pct' : 'water_budget_pct'), '#e05252'),
+  ], { y: { min: 0, max: 105 } });
+
+  ['s-summary','s-charts','s-charts2','s-charts3','s-charts4'].forEach((id) => $(id).style.display = '');
+}
+
+// ── Journal des consignes ─────────────────────────────────────────────
+const LABELS = {
+  cmd: 'Commande', setpoints_set: 'Consignes', response: 'Réponse ESP32',
+  ota: 'Firmware', online: 'Serre en ligne', offline: 'Serre hors ligne',
+};
+
+function describe(type, label, detail) {
+  if (type === 'connection') return LABELS[label] || label;
+
+  const d = detail || {};
+  const keys = Object.keys(d);
+  if (!keys.length) return '—';
+
+  if (type === 'setpoints') {
+    // detail = {champ: {from, to}}
+    return keys.map((k) =>
+      `<b>${k}</b> ${d[k]?.from ?? '—'} → ${d[k]?.to ?? '—'}`).join('<br>');
+  }
+  if (d.action) {
+    const rest = keys.filter((k) => k !== 'action')
+      .map((k) => `${k}=${JSON.stringify(d[k])}`).join(' ');
+    return `<b>${d.action}</b>${rest ? ' ' + rest : ''}`;
+  }
+  // setpoints/set : liste brute des champs envoyés
+  return keys.map((k) => `<b>${k}</b>=${JSON.stringify(d[k])}`).join(', ');
+}
+
+function renderLog(activity) {
+  $('nlog').textContent = `${activity.length} entrée${activity.length > 1 ? 's' : ''}`;
+  $('logbody').innerHTML = activity.length
+    ? activity.map((a) => {
+        const d = new Date(a.ts);
+        const time = `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const name = a.type === 'command' ? (LABELS[a.label] || a.label)
+                   : a.type === 'setpoints' ? 'Setpoints' : 'Connexion';
+        return `<tr><td class="time">${time}</td>
+                <td><span class="tag t-${a.type}">${name}</span></td>
+                <td class="detail">${describe(a.type, a.label, a.detail)}</td></tr>`;
+      }).join('')
+    : '<tr><td colspan="3" class="msg">Aucune consigne envoyée sur cette période.</td></tr>';
+  $('s-log').style.display = '';
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────
+$('b-csv').addEventListener('click',    () => location.href = '/api/export?' + params());
+$('b-csv-ev').addEventListener('click', () => location.href = '/api/export?what=events&' + params());
+$('b-load').addEventListener('click', load);
+
+if ($('f-token').value.trim()) load();
+</script>
+</body>
+</html>
