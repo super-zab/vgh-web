@@ -1165,9 +1165,28 @@ async function otaStart(){
   if(!client||!client.connected){alert('Connecte-toi d\'abord au broker.');return;}
   const f=$('ota-file').files[0];
   if(!f){alert('Choisis un fichier .bin.');return;}
+  /* L'ESP32 n'embarque pas de compilateur : Update.write() recopie les octets
+     reçus tels quels dans la partition OTA, ils doivent donc déjà être du code
+     machine. Du source C++ ne peut pas être envoyé directement.               */
+  if(/\.(ino|cpp|c|h|hpp|zip)$/i.test(f.name)){
+    alert('« '+f.name+' » est du code source : l\'ESP32 ne sait pas le compiler, '
+        + 'il ne peut recevoir que du firmware déjà compilé.\n\n'
+        + 'Dans Arduino IDE : Croquis → Exporter les binaires compilées, puis reprends '
+        + 'ici le .bin du dossier build — celui SANS « merged » dans le nom.');
+    return;
+  }
   if(!f.name.endsWith('.bin')){alert('Le fichier doit être un .bin exporté par Arduino IDE.');return;}
   if(f.size<100000||f.size>3500000){if(!confirm('Taille inhabituelle ('+f.size+' octets). Continuer ?'))return;}
   const buf=new Uint8Array(await f.arrayBuffer());
+  /* Toute image ESP32 valide commence par l'octet magique 0xE9. Le firmware la
+     refuserait de toute façon, mais après deux minutes de transfert : autant
+     détecter le mauvais fichier tout de suite.                                */
+  if(buf[0]!==0xE9){
+    alert('Ce fichier n\'est pas une image ESP32 valide : il commence par '
+        + (buf.length?'0x'+buf[0].toString(16).toUpperCase().padStart(2,'0'):'rien, il est vide')
+        + ' au lieu de 0xE9.\n\nReprends le .bin exporté par Arduino IDE.');
+    return;
+  }
   const md5=SparkMD5.ArrayBuffer.hash(buf.buffer);
   ota={active:true,buf,seq:0,total:Math.ceil(buf.length/OTA_DATA_BYTES),timer:null};
   $('btn-ota').disabled=true;$('btn-ota-abort').disabled=false;
