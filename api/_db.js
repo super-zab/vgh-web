@@ -13,13 +13,18 @@ import { neon } from '@neondatabase/serverless';
 let _sql;
 export function sql(...args) {
   if (!_sql) {
-    const url = (process.env.DATABASE_URL || '')
+    const url = (
+        process.env.DATABASEVGH_DATABASE_URL
+        || process.env.DATABASE_URL
+        || process.env.DATABASEVGH_POSTGRES_URL
+        || ''
+      )
       .trim()
       .replace(/^psql\s+/, '')
       .replace(/^['"]|['"]$/g, '');
     if (!url) {
       throw new Error(
-        'DATABASE_URL non configurée sur Vercel (Settings → Environment Variables)');
+        'DATABASEVGH_DATABASE_URL (ou DATABASE_URL) non configurée sur Vercel');
     }
     _sql = neon(url);
   }
