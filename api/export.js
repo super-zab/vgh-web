@@ -22,10 +22,14 @@ function toCsv(rows) {
   ].join('\r\n');
 }
 
-export default async function handler(req, res) {
-  if (denied(req, res)) return;
+/* Vercel refuse toute réponse de fonction dépassant 4,5 Mo : au-delà, on
+ * répond une erreur explicite plutôt que de laisser la plateforme couper. */
+const MAX_BYTES = 4_000_000;
 
+export default async function handler(req, res) {
   try {
+    if (denied(req, res)) return;
+
     const { q, from, to, gh } = range(req);
     const what = q.get('what') || 'telemetry';
 
@@ -44,15 +48,25 @@ export default async function handler(req, res) {
           FROM telemetry
           WHERE gh = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
           ORDER BY ts
-          LIMIT 200000`;
+          LIMIT 100000`;
+
+    const body = '﻿' + toCsv(rows);            // BOM pour Excel
+    const bytes = Buffer.byteLength(body);
+    if (bytes > MAX_BYTES) {
+      return res.status(413).json({
+        error: `CSV trop volumineux pour Vercel : ${(bytes / 1e6).toFixed(1)} Mo `
+             + `pour ${rows.length} lignes (limite 4,5 Mo). Réduis la plage de dates.`,
+      });
+    }
 
     const stamp = from.toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition',
       `attachment; filename="vgh-${gh}-${what}-${stamp}.csv"`);
-    res.status(200).send('﻿' + toCsv(rows));   // BOM pour Excel
+    res.status(200).send(body);
 
   } catch (e) {
+    console.error('export:', e);              // visible dans l'onglet Logs de Vercel
     res.status(500).json({ error: e.message });
   }
 }

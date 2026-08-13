@@ -6,9 +6,9 @@
 import { sql, denied, range } from './_db.js';
 
 export default async function handler(req, res) {
-  if (denied(req, res)) return;
-
   try {
+    if (denied(req, res)) return;
+
     const { from, to, gh } = range(req);
 
     const [activity, setpoints] = await Promise.all([
@@ -35,6 +35,7 @@ export default async function handler(req, res) {
     });
 
   } catch (e) {
+    console.error('events:', e);
     res.status(500).json({ error: e.message });
   }
 }

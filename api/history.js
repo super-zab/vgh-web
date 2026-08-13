@@ -8,9 +8,9 @@
 import { sql, denied, range } from './_db.js';
 
 export default async function handler(req, res) {
-  if (denied(req, res)) return;
-
   try {
+    if (denied(req, res)) return;
+
     const { q, from, to, gh, hours } = range(req);
     const asked = q.get('resolution') || 'auto';
     const hourly = asked === 'hourly' || (asked === 'auto' && hours > 72);
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
     res.status(200).json({ resolution: 'raw', count: rows.length, rows });
 
   } catch (e) {
+    console.error('history:', e);
     res.status(500).json({ error: e.message });
   }
 }
