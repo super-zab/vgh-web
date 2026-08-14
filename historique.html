@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Serre VGH — Historique</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
 <style>
 :root{
  --bg:#0e0f11;--bg2:#17191c;--panel:#16181b;--bd:#2a2e33;--bd2:#333940;
@@ -15,6 +13,7 @@
  --r:12px;--sh:0 1px 0 rgba(255,255,255,.02) inset,0 2px 8px rgba(0,0,0,.25);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
 body{font-family:system-ui,-apple-system,sans-serif;background:
  radial-gradient(1200px 600px at 80% -10%,#14201b 0%,transparent 55%),var(--bg);
  color:var(--tx);padding:20px 16px 40px;max-width:1120px;margin:0 auto;-webkit-font-smoothing:antialiased;}
@@ -23,6 +22,12 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
 .brand p{font-size:12px;color:var(--mt);margin-top:2px;}
 a{color:var(--ac);text-decoration:none;}
 a:hover{text-decoration:underline;}
+.pagenav{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--bd);border-radius:999px;
+ padding:4px;margin-bottom:16px;width:fit-content;}
+.pagenav-item{padding:7px 16px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--mt);
+ text-decoration:none;transition:background .15s,color .15s;}
+.pagenav-item:hover{color:var(--tx);text-decoration:none;}
+.pagenav-item.active{background:var(--panel);color:var(--tx);box-shadow:0 1px 0 rgba(255,255,255,.03) inset;}
 section{background:var(--panel);border:1px solid var(--bd);border-radius:var(--r);
  padding:16px;margin-bottom:14px;box-shadow:var(--sh);}
 .sec-title{font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.08em;
@@ -65,62 +70,21 @@ td.time{color:var(--mt);white-space:nowrap;font-variant-numeric:tabular-nums;}
 .msg.err{color:var(--cr);}
 footer{font-size:11px;color:var(--mt2);margin-top:16px;text-align:center;}
 @media(max-width:600px){.chart-wrap{height:200px;}}
-
-/* ── statut MQTT (en-tête) ── */
-.status{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-.chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--bd);
- border-radius:999px;padding:6px 12px;font-size:12px;color:var(--mt);}
-.chip strong{color:var(--tx);font-weight:600;}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--mt2);transition:background .3s,box-shadow .3s;}
-.dot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(37,169,126,.18);}
-.dot.err{background:var(--cr);box-shadow:0 0 0 3px rgba(224,82,82,.18);}
-.badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:600;}
-.b-auto{background:#0c2b20;color:var(--ok);}.b-fallback{background:#2e1e05;color:var(--wn);}
-.b-manual{background:#0c1e33;color:var(--in);}.b-standby{background:#24282d;color:var(--mt);}
-
-/* ── connexion / commandes / setpoints / OTA (portées depuis index.html) ── */
-.conn-grid{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end;}
-@media(max-width:700px){.conn-grid{grid-template-columns:1fr 1fr;}}
-.sub{margin-top:10px;font-size:11px;color:var(--mt);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-input.changed{border-color:var(--wn);background:#1a1608;}
-button.btn-ok{border-color:var(--ok);color:var(--ok);}
-button.btn-danger{border-color:var(--cr);color:var(--cr);}
-.divider{width:1px;height:22px;background:var(--bd);margin:0 3px;}
-.hint{font-size:11px;color:var(--wn);margin-top:12px;display:flex;gap:6px;align-items:flex-start;}
-details{margin-bottom:9px;background:#131518;border:1px solid var(--bd);border-radius:10px;overflow:hidden;}
-details[open]{border-color:var(--bd2);}
-details summary{cursor:pointer;padding:12px 14px;font-size:13px;font-weight:500;color:var(--tx);
- user-select:none;list-style:none;display:flex;align-items:center;gap:9px;}
-details summary::-webkit-details-marker{display:none;}
-details summary::before{content:'';width:6px;height:6px;border-right:2px solid var(--ac);border-bottom:2px solid var(--ac);
- transform:rotate(-45deg);transition:transform .2s;margin-left:2px;}
-details[open] summary::before{transform:rotate(45deg);}
-details .inner{padding:2px 14px 16px;}
-.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px;}
-.sp-item label{font-size:11px;color:var(--mt);display:block;margin-bottom:5px;line-height:1.3;}
-.sp-item input{width:100%;}
-.sp-item .u{font-size:10px;color:var(--mt2);margin-left:4px;}
-.bwrap{height:10px;background:#0f1113;border:1px solid var(--bd);border-radius:999px;overflow:hidden;margin:12px 0 8px;}
-.bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ok),var(--ac));width:0;transition:width .2s;}
-#log{font-family:ui-monospace,'SF Mono',monospace;font-size:11px;color:var(--mt);background:#0f1113;
- border:1px solid var(--bd);border-radius:8px;padding:12px;max-height:170px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
-input[type=range]{accent-color:var(--ac);padding:0;border:none;background:none;}
-input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 </style>
 </head>
 <body>
 
+<!-- ═══ NAVIGATION ═══ -->
+<nav class="pagenav">
+  <a href="/" class="pagenav-item">Visualisation en direct</a>
+  <a href="/historique" class="pagenav-item active">Historique</a>
+  <a href="/pilotage" class="pagenav-item">Pilotage</a>
+</nav>
+
 <header>
   <div class="brand">
     <h1>Serre VGH — Historique</h1>
-    <p>Données enregistrées en continu, même site fermé · <a href="/">← Contrôle en direct</a></p>
-  </div>
-  <div class="status">
-    <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
-    <span class="chip"><span class="dot" id="dot-esp"></span>ESP32&nbsp;<strong id="st-esp">inconnu</strong></span>
-    <span class="chip">Mode <span id="sysmode" class="badge b-standby">--</span></span>
-    <span class="chip">Saison&nbsp;<strong id="season" style="color:var(--ac)">--</strong></span>
-    <span class="chip" id="lastseen" style="display:none"></span>
+    <p>Données enregistrées en continu, même site fermé</p>
   </div>
 </header>
 
@@ -183,76 +147,6 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
       <tbody id="logbody"></tbody>
     </table>
   </div>
-</section>
-
-<!-- ═══ CONNEXION BROKER (pilotage en direct) ═══ -->
-<section id="s-conn" style="display:none">
-  <div class="sec-title">Connexion au broker MQTT <span class="fill"></span><span class="aside">HiveMQ Cloud</span></div>
-  <div class="conn-grid">
-    <div class="field"><label>Cluster (ex. abc123.s1.eu.hivemq.cloud)</label><input id="c-host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud" value="cf16d20ab8c24da6898f5704c619ae01.s1.eu.hivemq.cloud"></div>
-    <div class="field"><label>Utilisateur</label><input id="c-user" placeholder="vgh-web" value="vgh-web"></div>
-    <div class="field"><label>Mot de passe</label><input id="c-pass" type="password"></div>
-    <button class="btn-ok" id="btn-conn" onclick="toggleConn()">Se connecter</button>
-  </div>
-  <div class="sub">
-    Topic de base <input id="c-base" value="vgh/gh1" style="width:110px;padding:4px 8px;font-size:11px">
-    — identifiants mémorisés dans ce navigateur uniquement.
-  </div>
-</section>
-
-<!-- ═══ COMMANDES ═══ -->
-<section id="s-cmd" style="display:none">
-  <div class="sec-title">Commandes <span class="fill"></span></div>
-  <div class="row">
-    <button class="btn-ok" onclick="cmd({action:'resume'})">&#9654; Reprendre AUTO</button>
-    <button onclick="cmd({action:'standby'})">&#9646;&#9646; Veille</button>
-    <button class="btn-danger" onclick="if(confirm('Redémarrer l\'ESP32 ?'))cmd({action:'restart'})">&#8635; Redémarrer</button>
-    <span class="divider"></span>
-    <span style="color:var(--mt);font-size:12px">Saison</span>
-    <button onclick="cmd({action:'season',val:'HOT-DRY'})">HOT-DRY</button>
-    <button onclick="cmd({action:'season',val:'HOT-WET'})">HOT-WET</button>
-    <button onclick="cmd({action:'season',val:'COOL'})">COOL</button>
-  </div>
-  <div class="row" style="margin-top:11px">
-    <span style="color:var(--mt);font-size:12px">Manuel</span>
-    <label style="font-size:12px;color:var(--mt)">Fan <span id="fan-pct">50</span>%</label>
-    <input type="range" id="fan-slider" min="0" max="100" value="50" style="width:160px" oninput="document.getElementById('fan-pct').textContent=this.value">
-    <button onclick="cmd({action:'fan',val:Math.round(document.getElementById('fan-slider').value*2.55)})">Appliquer fan</button>
-    <span class="divider"></span>
-    <button onclick="cmd({action:'valve',val:'open'})">Ouvrir vanne</button>
-    <button onclick="cmd({action:'valve',val:'close'})">Fermer vanne</button>
-  </div>
-  <div class="hint">⚠ Une commande manuelle passe le système en mode MANUAL — cliquer « Reprendre AUTO » pour rendre la main à la régulation.</div>
-</section>
-
-<!-- ═══ SETPOINTS ═══ -->
-<section id="s-sp" style="display:none">
-  <div class="sec-title">Paramètres de régulation (setpoints) <span class="fill"></span><span class="aside" id="sp-status">en attente de données…</span></div>
-  <div id="sp-groups"></div>
-  <div class="row" style="margin-top:12px">
-    <button class="btn-ok" id="btn-sp-send" onclick="sendSetpoints()" disabled>Envoyer les modifications (<span id="sp-count">0</span>)</button>
-    <button onclick="cmd({action:'getSetpoints'})">Recharger depuis l'ESP32</button>
-    <span style="font-size:11px;color:var(--mt)">Sauvegardés en flash (NVS), conservés après redémarrage. Un changement de saison réinitialise aux presets.</span>
-  </div>
-</section>
-
-<!-- ═══ OTA ═══ -->
-<section id="s-ota" style="display:none">
-  <div class="sec-title">Mise à jour du firmware <span class="fill"></span><span class="aside">OTA</span></div>
-  <div class="row">
-    <input type="file" id="ota-file" accept=".bin">
-    <button class="btn-ok" id="btn-ota" onclick="otaStart()">Téléverser</button>
-    <button class="btn-danger" id="btn-ota-abort" onclick="otaAbort()" disabled>Annuler</button>
-  </div>
-  <div class="bwrap"><div class="bar" id="ota-bar"></div></div>
-  <div style="font-size:12px;color:var(--mt)" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build.</div>
-  <div class="hint">⚠ Ne pas fermer cette page pendant le transfert. L'ESP32 vérifie le MD5 et redémarre si tout est valide ; sinon il conserve l'ancien firmware.</div>
-</section>
-
-<!-- ═══ JOURNAL DE SESSION ═══ -->
-<section id="s-jlog" style="display:none">
-  <div class="sec-title">Journal de session <span class="fill"></span><span class="aside">connexion, commandes, OTA — cette visite seulement</span></div>
-  <div id="log"></div>
 </section>
 
 <footer>Serre VGH · les données restent disponibles indépendamment de l'état de la serre</footer>
@@ -347,12 +241,6 @@ async function load() {
       fetch('/api/events?' + p),
     ]);
     if (!hRes.ok) throw new Error((await hRes.json()).error || `Erreur ${hRes.status}`);
-
-    // Jeton valide : révèle le pilotage (Connexion/Commandes/Setpoints/OTA/Journal)
-    // indépendamment de la présence de données télémétrie sur la période choisie —
-    // sinon une période vide masquerait le pilotage même avec le bon jeton.
-    ['s-conn','s-cmd','s-sp','s-ota','s-jlog'].forEach((id) => $(id).style.display = '');
-
     const hist = await hRes.json();
     const events = eRes.ok ? await eRes.json() : { activity: [] };
 
@@ -506,241 +394,6 @@ function renderLog(activity) {
 $('b-csv').addEventListener('click',    () => location.href = '/api/export?' + params());
 $('b-csv-ev').addEventListener('click', () => location.href = '/api/export?what=events&' + params());
 $('b-load').addEventListener('click', load);
-
-/* ════════ PILOTAGE EN DIRECT (porté depuis index.html) ════════
-   Révélé une fois que load() a validé le jeton (requête /api/history réussie) —
-   pas de second verrou : le jeton VGH_API_TOKEN est la seule protection. */
-let client=null, base='vgh/gh1', wantConn=false;
-let currentSp=null;
-let ota={active:false};
-
-function log(m){const e=$('log');if(!e)return;const t=new Date().toLocaleTimeString();e.textContent=t+'  '+m+'\n'+e.textContent.slice(0,8000);}
-function set(id,txt,col){const e=$(id);if(!e)return;if(txt!==null&&txt!==undefined)e.textContent=txt;if(col)e.style.color=col;}
-
-/* ── schéma des setpoints — identique à index.html ── */
-const SP_SCHEMA=[
- {g:'Ventilateurs — seuils température',f:[
-  ['fanTempStartC','Démarrage ventilateurs','°C',0.5,15,45],['fanTempMedC','Vitesse moyenne','°C',0.5,15,45],
-  ['fanTempHighC','Vitesse haute','°C',0.5,20,48],['fanTempEmergC','Urgence ventilateurs','°C',0.5,25,50],
-  ['tempEmergencyC','Urgence température (100%)','°C',0.5,25,55]]},
- {g:'Ventilateurs — PWM & dynamique',f:[
-  ['fanMinRunPWM','PWM minimum en marche','0-255',1,0,255],['fanFallbackPWM','PWM mode dégradé','0-255',1,0,255],
-  ['fanStartBoostPWM','PWM boost démarrage','0-255',1,0,255],['fanStartBoostMs','Durée boost démarrage','ms',100,0,10000],
-  ['fanRampStep','Pas de rampe','pwm/s',1,1,64],['nightMinFanPWM','PWM min nuit','0-255',1,0,255],
-  ['condensationFanPWM','PWM anti-condensation','0-255',1,0,255],['fanVPDGain','Gain VPD','pwm/kPa',1,0,200],
-  ['leafHotBoostPWM','Boost feuille chaude','pwm',1,0,120]]},
- {g:'VPD (kPa)',f:[
-  ['vpdLowKPa','VPD bas',' ',0.1,0,3],['vpdMistMinKPa','VPD min brumisation',' ',0.1,0,4],
-  ['vpdGoodHighKPa','VPD haut acceptable',' ',0.1,0,4],['vpdStressKPa','VPD stress',' ',0.1,0.5,5],
-  ['vpdSevereKPa','VPD sévère',' ',0.1,0.5,6],['vpdEmergencyKPa','VPD urgence',' ',0.1,1,7],
-  ['targetVPD_Day_kPa','VPD cible jour',' ',0.1,0.2,3],['targetVPD_Night_kPa','VPD cible nuit',' ',0.1,0.1,2]]},
- {g:'Humidité relative (%)',f:[
-  ['rhTooLow','RH trop basse',' ',1,0,100],['rhHighForMist','RH max pour brumisation',' ',1,0,100],['rhVeryHigh','RH très haute',' ',1,0,100]]},
- {g:'Température foliaire',f:[
-  ['leafDeltaWarnC','Delta alerte','°C',0.1,0,10],['leafDeltaStressC','Delta stress','°C',0.1,0,12],
-  ['leafDeltaSevereC','Delta sévère','°C',0.1,0,15],['leafTempEmergencyC','Temp feuille urgence','°C',0.5,25,55],
-  ['leafDewMarginMinC','Marge rosée min','°C',0.1,0,8],['nightDewMarginFanC','Marge rosée nuit (fan)','°C',0.1,0,8]]},
- {g:'Vanne / brumisation',f:[
-  ['valvePulseTempMinC','Temp min impulsion','°C',0.5,15,45],['valvePulseHardTempC','Temp impulsion forcée','°C',0.5,20,50],
-  ['valvePulseRHMin','RH min','%',1,0,100],['valvePulseRHMax','RH max','%',1,0,100],
-  ['valveMinVPDToAllow','VPD min autorisation','kPa',0.1,0,4],
-  ['valvePulseOnMsNormal','Impulsion ON normal','ms',500,1000,30000],['valvePulseOffMsNormal','Pause OFF normal','ms',1000,5000,600000],
-  ['valvePulseOnMsSevere','Impulsion ON sévère','ms',500,1000,30000],['valvePulseOffMsSevere','Pause OFF sévère','ms',1000,5000,600000],
-  ['valveMaxContinuousOpenMs','Ouverture continue max','ms',1000,2000,60000]]},
- {g:'Lumière (lux)',f:[
-  ['luxLow','Lux bas',' ',100,0,100000],['luxActive','Lux actif (brumisation)',' ',100,0,120000],['luxHigh','Lux haut',' ',1000,0,150000],
-  ['luxDayThreshold','Seuil passage jour',' ',50,0,5000],['luxNightThreshold','Seuil passage nuit',' ',50,0,5000]]},
- {g:'Fenêtres horaires',f:[
-  ['mistStartHour','Brumisation début — h','0-23',1,0,23],['mistStartMinute','Brumisation début — min','0-59',5,0,59],
-  ['mistStopHour','Brumisation fin — h','0-23',1,0,23],['mistStopMinute','Brumisation fin — min','0-59',5,0,59],
-  ['peakHeatStartHour','Pic chaleur début — h','0-23',1,0,23],['peakHeatStartMinute','Pic chaleur début — min','0-59',5,0,59],
-  ['peakHeatStopHour','Pic chaleur fin — h','0-23',1,0,23],['peakHeatStopMinute','Pic chaleur fin — min','0-59',5,0,59]]}
-];
-
-function buildSpUI(){
-  const box=$('sp-groups');box.innerHTML='';
-  SP_SCHEMA.forEach((grp,gi)=>{
-    const d=document.createElement('details');if(gi===0)d.open=true;
-    d.innerHTML='<summary>'+grp.g+'</summary>';
-    const inner=document.createElement('div');inner.className='inner';
-    const g=document.createElement('div');g.className='sp-grid';
-    grp.f.forEach(([k,label,unit,step,mn,mx])=>{
-      const it=document.createElement('div');it.className='sp-item';
-      it.innerHTML='<label>'+label+'<span class="u">'+(unit.trim()?('('+unit+')'):'')+'</span></label>'+
-        '<input type="number" step="'+step+'" min="'+mn+'" max="'+mx+'" title="Bornes : '+mn+' à '+mx+'" id="sp-'+k+'" data-key="'+k+'">';
-      g.appendChild(it);
-    });
-    inner.appendChild(g);d.appendChild(inner);box.appendChild(d);
-  });
-  box.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',updateSpDiff));
-}
-function fillSpUI(){
-  if(!currentSp)return;
-  SP_SCHEMA.forEach(grp=>grp.f.forEach(([k])=>{
-    const inp=$('sp-'+k);
-    if(inp&&currentSp[k]!==undefined&&document.activeElement!==inp){inp.value=currentSp[k];inp.classList.remove('changed');}
-  }));
-  set('sp-status','reçus de l\'ESP32 ('+new Date().toLocaleTimeString()+') — saison '+(currentSp.season||'?'));
-  updateSpDiff();
-}
-function spDiff(){
-  const changes={};
-  if(!currentSp)return changes;
-  SP_SCHEMA.forEach(grp=>grp.f.forEach(([k])=>{
-    const inp=$('sp-'+k);if(!inp||inp.value==='')return;
-    const v=Number(inp.value);
-    if(currentSp[k]!==undefined&&Math.abs(v-Number(currentSp[k]))>1e-6)changes[k]=v;
-  }));
-  return changes;
-}
-function updateSpDiff(){
-  const ch=spDiff(),n=Object.keys(ch).length;
-  SP_SCHEMA.forEach(grp=>grp.f.forEach(([k])=>{const i=$('sp-'+k);if(i)i.classList.toggle('changed',ch[k]!==undefined);}));
-  $('sp-count').textContent=n;
-  $('btn-sp-send').disabled=(n===0||!client||!client.connected);
-}
-function sendSetpoints(){
-  const ch=spDiff();
-  if(!Object.keys(ch).length)return;
-  const bounds={};SP_SCHEMA.forEach(g=>g.f.forEach(([k,,,,mn,mx])=>bounds[k]=[mn,mx]));
-  const bad=Object.entries(ch).filter(([k,v])=>v<bounds[k][0]||v>bounds[k][1]).map(([k])=>k);
-  if(bad.length){alert('Valeurs hors bornes (le firmware les rejetterait) : '+bad.join(', '));return;}
-  pub('setpoints/set',JSON.stringify(ch),1);
-  log('Setpoints envoyés : '+JSON.stringify(ch));
-}
-
-/* ── connexion MQTT ── */
-function toggleConn(){ if(client){wantConn=false;client.end(true);client=null;setWeb(false);$('btn-conn').textContent='Se connecter';} else connect(); }
-function setWeb(ok){$('dot-web').className='dot'+(ok?' live':'');set('st-web',ok?'connecté':'déconnecté');}
-function setEsp(state){
-  $('dot-esp').className='dot'+(state==='online'?' live':state==='offline'?' err':'');
-  set('st-esp',state==='online'?'en ligne':state==='offline'?'hors ligne':'inconnu');
-}
-function connect(){
-  const host=$('c-host').value.trim(),user=$('c-user').value.trim(),pass=$('c-pass').value;
-  base=$('c-base').value.trim()||'vgh/gh1';
-  if(!host){alert('Renseigne l\'URL du cluster HiveMQ.');return;}
-  localStorage.setItem('vgh',JSON.stringify({host,user,base}));
-  wantConn=true;
-  client=mqtt.connect('wss://'+host+':8884/mqtt',{
-    username:user,password:pass,keepalive:30,reconnectPeriod:4000,connectTimeout:10000,
-    clientId:'vgh-hist-'+Math.random().toString(16).slice(2,8)
-  });
-  client.on('connect',()=>{
-    setWeb(true);$('btn-conn').textContent='Se déconnecter';log('Connecté au broker.');
-    ['status','data','setpoints','cmd/resp','ota/status'].forEach(s=>client.subscribe(base+'/'+s,{qos:1}));
-  });
-  client.on('message',onMessage);
-  client.on('close',()=>{setWeb(false);if(!wantConn)return;});
-  client.on('error',e=>{log('Erreur MQTT : '+e.message);});
-}
-function pub(suffix,payload,qos){ if(client&&client.connected)client.publish(base+'/'+suffix,payload,{qos:qos===undefined?1:qos}); }
-function cmd(o){ pub('cmd',JSON.stringify(o)); log('Commande : '+JSON.stringify(o)); }
-
-function onMessage(topic,payload){
-  const t=topic.slice(base.length+1);
-  if(t==='status'){setEsp(payload.toString());return;}
-  if(t==='data'){
-    try{
-      const d=JSON.parse(payload.toString());
-      const ls=$('lastseen');ls.style.display='';ls.textContent='Dernière donnée '+new Date().toLocaleTimeString();
-      const mb=$('sysmode');mb.textContent=d.sysMode||'--';mb.className='badge b-'+(d.sysMode?d.sysMode.toLowerCase():'standby');
-      set('season',d.season||'--');
-    }catch(e){}
-    return;
-  }
-  if(t==='setpoints'){try{currentSp=JSON.parse(payload.toString());fillSpUI();}catch(e){}return;}
-  if(t==='cmd/resp'){try{const r=JSON.parse(payload.toString());log('ESP32 : '+r.msg);}catch(e){log('ESP32 : '+payload.toString());}return;}
-  if(t==='ota/status'){onOtaStatus(payload.toString());return;}
-}
-
-/* ── OTA ── */
-const OTA_DATA_BYTES=4092;
-const OTA_ACK_TIMEOUT=20000;
-
-function otaSetStatus(msg,colr){const e=$('ota-status');e.textContent=msg;e.style.color=colr||'var(--tx)';}
-function otaProgress(p){$('ota-bar').style.width=(p*100).toFixed(1)+'%';}
-
-async function otaStart(){
-  if(!client||!client.connected){alert('Connecte-toi d\'abord au broker.');return;}
-  const f=$('ota-file').files[0];
-  if(!f){alert('Choisis un fichier .bin.');return;}
-  if(/\.(ino|cpp|c|h|hpp|zip)$/i.test(f.name)){
-    alert('« '+f.name+' » est du code source : l\'ESP32 ne sait pas le compiler, '
-        + 'il ne peut recevoir que du firmware déjà compilé.\n\n'
-        + 'Dans Arduino IDE : Croquis → Exporter les binaires compilées, puis reprends '
-        + 'ici le .bin du dossier build — celui SANS « merged » dans le nom.');
-    return;
-  }
-  if(!f.name.endsWith('.bin')){alert('Le fichier doit être un .bin exporté par Arduino IDE.');return;}
-  if(f.size<100000||f.size>3500000){if(!confirm('Taille inhabituelle ('+f.size+' octets). Continuer ?'))return;}
-  const buf=new Uint8Array(await f.arrayBuffer());
-  if(buf[0]!==0xE9){
-    alert('Ce fichier n\'est pas une image ESP32 valide : il commence par '
-        + (buf.length?'0x'+buf[0].toString(16).toUpperCase().padStart(2,'0'):'rien, il est vide')
-        + ' au lieu de 0xE9.\n\nReprends le .bin exporté par Arduino IDE.');
-    return;
-  }
-  const md5=SparkMD5.ArrayBuffer.hash(buf.buffer);
-  ota={active:true,buf,seq:0,total:Math.ceil(buf.length/OTA_DATA_BYTES),timer:null};
-  $('btn-ota').disabled=true;$('btn-ota-abort').disabled=false;
-  otaProgress(0);
-  otaSetStatus('Initialisation… ('+(buf.length/1024).toFixed(0)+' Ko, '+ota.total+' chunks, MD5 '+md5.slice(0,8)+'…)');
-  armOtaTimeout();
-  pub('ota/ctrl',JSON.stringify({action:'begin',size:buf.length,md5}),1);
-  log('OTA begin : '+buf.length+' octets, MD5 '+md5);
-}
-function armOtaTimeout(){
-  clearTimeout(ota.timer);
-  ota.timer=setTimeout(()=>{ if(!ota.active)return;
-    otaFail('Pas de réponse de l\'ESP32 (20 s). Vérifie qu\'il est en ligne, puis réessaie.');
-    pub('ota/ctrl','{"action":"abort"}',1);
-  },OTA_ACK_TIMEOUT);
-}
-function otaSendChunk(i){
-  const off=i*OTA_DATA_BYTES;
-  const slice=ota.buf.subarray(off,off+OTA_DATA_BYTES);
-  const msg=new Uint8Array(4+slice.length);
-  msg[0]=(i>>>24)&255;msg[1]=(i>>>16)&255;msg[2]=(i>>>8)&255;msg[3]=i&255;
-  msg.set(slice,4);
-  client.publish(base+'/ota/data',msg,{qos:1});
-  armOtaTimeout();
-}
-function onOtaStatus(raw){
-  let s;try{s=JSON.parse(raw);}catch(e){return;}
-  if(!ota.active){ if(s.state==='error')log('OTA (ESP32) : '+(s.msg||'')); return; }
-  if(s.state==='ready'){ otaSetStatus('Transfert 0 / '+ota.total+' chunks…'); otaSendChunk(0); }
-  else if(s.state==='chunk'){
-    const next=s.ack+1;
-    otaProgress(s.received/ota.buf.length);
-    if(next<ota.total){ if(next%10===0)otaSetStatus('Transfert '+next+' / '+ota.total+' chunks…'); otaSendChunk(next); }
-    else{ otaSetStatus('Vérification et flash…'); armOtaTimeout(); pub('ota/ctrl','{"action":"end"}',1); }
-  }
-  else if(s.state==='success'){
-    clearTimeout(ota.timer);ota.active=false;otaProgress(1);
-    otaSetStatus('✔ Firmware flashé — l\'ESP32 redémarre. Il repasse en ligne dans ~30 s.','#1D9E75');
-    log('OTA réussi.');
-    $('btn-ota').disabled=false;$('btn-ota-abort').disabled=true;
-  }
-  else if(s.state==='error'){ otaFail('Erreur ESP32 : '+(s.msg||'inconnue')); }
-  else if(s.state==='aborted'){ otaFail('Transfert annulé.'); }
-}
-function otaFail(msg){
-  clearTimeout(ota.timer);ota.active=false;
-  otaSetStatus('✘ '+msg+' — l\'ancien firmware reste actif. Tu peux relancer le téléversement.','#E24B4A');
-  log('OTA : '+msg);
-  $('btn-ota').disabled=false;$('btn-ota-abort').disabled=true;
-}
-function otaAbort(){ if(!ota.active)return; pub('ota/ctrl','{"action":"abort"}',1); otaFail('Annulé par l\'utilisateur.'); }
-
-/* ── init ── */
-buildSpUI();
-try{
-  const saved=JSON.parse(localStorage.getItem('vgh')||'{}');
-  if(saved.host)$('c-host').value=saved.host;
-  if(saved.user)$('c-user').value=saved.user;
-  if(saved.base)$('c-base').value=saved.base;
-}catch(e){}
 
 if ($('f-token').value.trim()) load();
 </script>

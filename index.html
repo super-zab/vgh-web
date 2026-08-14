@@ -13,9 +13,17 @@
  --r:12px;--sh:0 1px 0 rgba(255,255,255,.02) inset,0 2px 8px rgba(0,0,0,.25);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
 body{font-family:system-ui,-apple-system,sans-serif;background:
  radial-gradient(1200px 600px at 80% -10%,#14201b 0%,transparent 55%),var(--bg);
  color:var(--tx);padding:20px 16px 40px;max-width:1120px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+
+.pagenav{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--bd);border-radius:999px;
+ padding:4px;margin-bottom:16px;width:fit-content;}
+.pagenav-item{padding:7px 16px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--mt);
+ text-decoration:none;transition:background .15s,color .15s;}
+.pagenav-item:hover{color:var(--tx);text-decoration:none;}
+.pagenav-item.active{background:var(--panel);color:var(--tx);box-shadow:0 1px 0 rgba(255,255,255,.03) inset;}
 
 header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
 .brand h1{font-size:20px;font-weight:600;letter-spacing:-.01em;}
@@ -104,11 +112,18 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
 </head>
 <body>
 
+<!-- ═══ NAVIGATION ═══ -->
+<nav class="pagenav">
+  <a href="/" class="pagenav-item active">Visualisation en direct</a>
+  <a href="/historique" class="pagenav-item">Historique</a>
+  <a href="/pilotage" class="pagenav-item">Pilotage</a>
+</nav>
+
 <!-- ═══ EN-TÊTE ═══ -->
 <header>
   <div class="brand">
     <h1>Serre VGH</h1>
-    <p>Contrôle à distance · liaison chiffrée TLS via MQTT · <a href="/historique" style="color:var(--ac);text-decoration:none">Historique →</a></p>
+    <p>Lecture seule · liaison chiffrée TLS via MQTT</p>
   </div>
   <div class="status">
     <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
@@ -594,7 +609,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   </div>
 </section>
 
-<footer>Virtual Greenhouse — Light Kinetics · lecture seule · pilotage et réglages sur la page <a href="/historique" style="color:var(--ac)">Historique</a></footer>
+<footer>Virtual Greenhouse — Light Kinetics · lecture seule · commandes et réglages sur la page <a href="/pilotage" style="color:var(--ac)">Pilotage</a></footer>
 
 <script>
 'use strict';
