@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Serre VGH — Pilotage</title>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
 <style>
 :root{
  --bg:#0e0f11;--bg2:#17191c;--bg3:#20232700;--panel:#16181b;--bd:#2a2e33;--bd2:#333940;
@@ -95,7 +94,6 @@ details .inner{padding:2px 14px 16px;}
 .lock-err{font-size:11.5px;color:var(--cr);margin-top:8px;}
 
 footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-height:1.6;}
-input[type=range]{accent-color:var(--ac);padding:0;border:none;background:none;}
 input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 </style>
 </head>
@@ -112,13 +110,12 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 <header>
   <div class="brand">
     <h1>Serre VGH — Pilotage</h1>
-    <p>Commandes en direct, setpoints, mise à jour du firmware</p>
+    <p>Commandes en direct, configuration, mise à jour du firmware</p>
   </div>
   <div class="status" id="status-chips" hidden>
     <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
     <span class="chip"><span class="dot" id="dot-esp"></span>ESP32&nbsp;<strong id="st-esp">inconnu</strong></span>
     <span class="chip">Mode <span id="sysmode" class="badge b-standby">--</span></span>
-    <span class="chip">Saison&nbsp;<strong id="season" style="color:var(--ac)">--</strong></span>
     <span class="chip" id="lastseen" style="display:none"></span>
   </div>
 </header>
@@ -166,35 +163,39 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 <section>
   <div class="sec-title">Commandes <span class="fill"></span></div>
   <div class="row">
-    <button class="btn-ok" onclick="cmd({action:'resume'})">&#9654; Reprendre AUTO</button>
-    <button onclick="cmd({action:'standby'})">&#9646;&#9646; Veille</button>
-    <button class="btn-danger" onclick="if(confirm('Redémarrer l\'ESP32 ?'))cmd({action:'restart'})">&#8635; Redémarrer</button>
+    <span style="color:var(--mt);font-size:12px">Mode</span>
+    <button class="btn-ok" onclick="cmd({action:'auto'})">&#9654; AUTO</button>
+    <button onclick="cmd({action:'manual'})">MANUEL</button>
+    <button onclick="cmd({action:'standby'})">&#9646;&#9646; VEILLE</button>
+    <button onclick="cmd({action:'fallback'})">FALLBACK</button>
     <span class="divider"></span>
-    <span style="color:var(--mt);font-size:12px">Saison</span>
-    <button onclick="cmd({action:'season',val:'HOT-DRY'})">HOT-DRY</button>
-    <button onclick="cmd({action:'season',val:'HOT-WET'})">HOT-WET</button>
-    <button onclick="cmd({action:'season',val:'COOL'})">COOL</button>
+    <button class="btn-danger" onclick="if(confirm('Redémarrer l\'ESP32 ?'))cmd({action:'restart'})">&#8635; Redémarrer</button>
   </div>
   <div class="row" style="margin-top:11px">
-    <span style="color:var(--mt);font-size:12px">Manuel</span>
-    <label style="font-size:12px;color:var(--mt)">Fan <span id="fan-pct">50</span>%</label>
-    <input type="range" id="fan-slider" min="0" max="100" value="50" style="width:160px" oninput="document.getElementById('fan-pct').textContent=this.value">
-    <button onclick="cmd({action:'fan',val:Math.round(document.getElementById('fan-slider').value*2.55)})">Appliquer fan</button>
-    <span class="divider"></span>
-    <button onclick="cmd({action:'valve',val:'open'})">Ouvrir vanne</button>
-    <button onclick="cmd({action:'valve',val:'close'})">Fermer vanne</button>
+    <span style="color:var(--mt);font-size:12px">Maintenance</span>
+    <button onclick="cmd({action:'getConfig'})">Recharger config</button>
+    <button onclick="if(confirm('Revenir à la configuration par défaut ?'))cmd({action:'resetConfig'})">Config par défaut</button>
+    <button onclick="cmd({action:'resetWater'})">RAZ compteur eau</button>
+    <button onclick="cmd({action:'resetEnergy'})">RAZ compteurs énergie</button>
+    <button onclick="cmd({action:'publish'})">Publier maintenant</button>
+    <button onclick="cmd({action:'rescan'})">Redétecter capteurs</button>
   </div>
-  <div class="hint">⚠ Une commande manuelle passe le système en mode MANUAL — cliquer « Reprendre AUTO » pour rendre la main à la régulation.</div>
+  <div class="row" style="margin-top:11px">
+    <span style="color:var(--mt);font-size:12px">Tampon SD</span>
+    <button onclick="cmd({action:'flushSpool'})">Rejouer le tampon</button>
+    <button class="btn-danger" onclick="if(confirm('Effacer définitivement le tampon SD non envoyé ?'))cmd({action:'dropSpool'})">Vider le tampon</button>
+  </div>
+  <div class="hint">⚠ En MANUEL, les durées de cycle viennent de <code>manPeriodS</code>/<code>manFanOnS</code>/<code>manMistOnS</code> dans la configuration ci-dessous — plus de réglage instantané fan/vanne, tout passe par des cycles temporisés.</div>
 </section>
 
-<!-- ═══ SETPOINTS ═══ -->
+<!-- ═══ CONFIGURATION ═══ -->
 <section>
-  <div class="sec-title">Paramètres de régulation (setpoints) <span class="fill"></span><span class="aside" id="sp-status">en attente de données…</span></div>
+  <div class="sec-title">Configuration <span class="fill"></span><span class="aside" id="sp-status">en attente de données…</span></div>
   <div id="sp-groups"></div>
   <div class="row" style="margin-top:12px">
     <button class="btn-ok" id="btn-sp-send" onclick="sendSetpoints()" disabled>Envoyer les modifications (<span id="sp-count">0</span>)</button>
-    <button onclick="cmd({action:'getSetpoints'})">Recharger depuis l'ESP32</button>
-    <span style="font-size:11px;color:var(--mt)">Sauvegardés en flash (NVS), conservés après redémarrage. Un changement de saison réinitialise aux presets.</span>
+    <button onclick="cmd({action:'getConfig'})">Recharger depuis l'ESP32</button>
+    <span style="font-size:11px;color:var(--mt)">Sauvegardée en flash (NVS), conservée après redémarrage.</span>
   </div>
 </section>
 
@@ -203,12 +204,11 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
   <div class="sec-title">Mise à jour du firmware <span class="fill"></span><span class="aside">OTA</span></div>
   <div class="row">
     <input type="file" id="ota-file" accept=".bin">
-    <button class="btn-ok" id="btn-ota" onclick="otaStart()">Téléverser</button>
-    <button class="btn-danger" id="btn-ota-abort" onclick="otaAbort()" disabled>Annuler</button>
+    <button class="btn-ok" id="btn-ota" onclick="otaStart()">Téléverser et lancer l'OTA</button>
   </div>
   <div class="bwrap"><div class="bar" id="ota-bar"></div></div>
-  <div style="font-size:12px;color:var(--mt)" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build.</div>
-  <div class="hint">⚠ Ne pas fermer cette page pendant le transfert. L'ESP32 vérifie le MD5 et redémarre si tout est valide ; sinon il conserve l'ancien firmware.</div>
+  <div style="font-size:12px;color:var(--mt)" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build. Le fichier est d'abord hébergé sur ce site, puis l'ESP32 va le télécharger lui-même.</div>
+  <div class="hint">⚠ Ne pas fermer cette page pendant l'envoi. En cas de succès, l'ESP32 redémarre seul ; en cas d'échec, l'ancienne partition reste active.</div>
 </section>
 
 <!-- ═══ JOURNAL DE SESSION ═══ -->
@@ -268,44 +268,37 @@ function applyLock(open){
   }catch(e){/* hors-ligne : reste verrouillé, l'utilisateur peut réessayer */}
 })();
 
-/* ── schéma des setpoints — identique aux autres pages ── */
+/* ── schéma de configuration — CFG_FIELDS de Greenhouse_V5.ino (33 champs) ── */
 const SP_SCHEMA=[
- {g:'Ventilateurs — seuils température',f:[
-  ['fanTempStartC','Démarrage ventilateurs','°C',0.5,15,45],['fanTempMedC','Vitesse moyenne','°C',0.5,15,45],
-  ['fanTempHighC','Vitesse haute','°C',0.5,20,48],['fanTempEmergC','Urgence ventilateurs','°C',0.5,25,50],
-  ['tempEmergencyC','Urgence température (100%)','°C',0.5,25,55]]},
- {g:'Ventilateurs — PWM & dynamique',f:[
-  ['fanMinRunPWM','PWM minimum en marche','0-255',1,0,255],['fanFallbackPWM','PWM mode dégradé','0-255',1,0,255],
-  ['fanStartBoostPWM','PWM boost démarrage','0-255',1,0,255],['fanStartBoostMs','Durée boost démarrage','ms',100,0,10000],
-  ['fanRampStep','Pas de rampe','pwm/s',1,1,64],['nightMinFanPWM','PWM min nuit','0-255',1,0,255],
-  ['condensationFanPWM','PWM anti-condensation','0-255',1,0,255],['fanVPDGain','Gain VPD','pwm/kPa',1,0,200],
-  ['leafHotBoostPWM','Boost feuille chaude','pwm',1,0,120]]},
- {g:'VPD (kPa)',f:[
-  ['vpdLowKPa','VPD bas',' ',0.1,0,3],['vpdMistMinKPa','VPD min brumisation',' ',0.1,0,4],
-  ['vpdGoodHighKPa','VPD haut acceptable',' ',0.1,0,4],['vpdStressKPa','VPD stress',' ',0.1,0.5,5],
-  ['vpdSevereKPa','VPD sévère',' ',0.1,0.5,6],['vpdEmergencyKPa','VPD urgence',' ',0.1,1,7],
-  ['targetVPD_Day_kPa','VPD cible jour',' ',0.1,0.2,3],['targetVPD_Night_kPa','VPD cible nuit',' ',0.1,0.1,2]]},
- {g:'Humidité relative (%)',f:[
-  ['rhTooLow','RH trop basse',' ',1,0,100],['rhHighForMist','RH max pour brumisation',' ',1,0,100],['rhVeryHigh','RH très haute',' ',1,0,100]]},
- {g:'Température foliaire',f:[
-  ['leafDeltaWarnC','Delta alerte','°C',0.1,0,10],['leafDeltaStressC','Delta stress','°C',0.1,0,12],
-  ['leafDeltaSevereC','Delta sévère','°C',0.1,0,15],['leafTempEmergencyC','Temp feuille urgence','°C',0.5,25,55],
-  ['leafDewMarginMinC','Marge rosée min','°C',0.1,0,8],['nightDewMarginFanC','Marge rosée nuit (fan)','°C',0.1,0,8]]},
- {g:'Vanne / brumisation',f:[
-  ['valvePulseTempMinC','Temp min impulsion','°C',0.5,15,45],['valvePulseHardTempC','Temp impulsion forcée','°C',0.5,20,50],
-  ['valvePulseRHMin','RH min','%',1,0,100],['valvePulseRHMax','RH max','%',1,0,100],
-  ['valveMinVPDToAllow','VPD min autorisation','kPa',0.1,0,4],
-  ['valvePulseOnMsNormal','Impulsion ON normal','ms',500,1000,30000],['valvePulseOffMsNormal','Pause OFF normal','ms',1000,5000,600000],
-  ['valvePulseOnMsSevere','Impulsion ON sévère','ms',500,1000,30000],['valvePulseOffMsSevere','Pause OFF sévère','ms',1000,5000,600000],
-  ['valveMaxContinuousOpenMs','Ouverture continue max','ms',1000,2000,60000]]},
- {g:'Lumière (lux)',f:[
-  ['luxLow','Lux bas',' ',100,0,100000],['luxActive','Lux actif (brumisation)',' ',100,0,120000],['luxHigh','Lux haut',' ',1000,0,150000],
-  ['luxDayThreshold','Seuil passage jour',' ',50,0,5000],['luxNightThreshold','Seuil passage nuit',' ',50,0,5000]]},
- {g:'Fenêtres horaires',f:[
-  ['mistStartHour','Brumisation début — h','0-23',1,0,23],['mistStartMinute','Brumisation début — min','0-59',5,0,59],
-  ['mistStopHour','Brumisation fin — h','0-23',1,0,23],['mistStopMinute','Brumisation fin — min','0-59',5,0,59],
-  ['peakHeatStartHour','Pic chaleur début — h','0-23',1,0,23],['peakHeatStartMinute','Pic chaleur début — min','0-59',5,0,59],
-  ['peakHeatStopHour','Pic chaleur fin — h','0-23',1,0,23],['peakHeatStopMinute','Pic chaleur fin — min','0-59',5,0,59]]}
+ {g:'Cycle jour',f:[
+  ['deltaLowC','Delta bas (int − ext)','°C',0.5,-20,20],['deltaHighC','Delta haut (int − ext)','°C',0.5,-20,20],
+  ['dayPeriodS','Période jour','s',30,30,7200],
+  ['dayOnMidS','Ventilo ON — delta moyen','s',10,0,7200],['dayOnHighS','Ventilo ON — delta haut','s',10,0,7200]]},
+ {g:'Cycle nuit',f:[
+  ['nightPeriodS','Période nuit','s',30,30,7200],['nightOnS','Ventilo ON nuit','s',10,0,7200],
+  ['nightMist','Brumisation nuit (0/1)',' ',1,0,1]]},
+ {g:'Mode dégradé (fallback)',f:[
+  ['fbDayPeriodS','Période fallback','s',30,30,7200],['fbDayOnS','Ventilo ON fallback','s',10,0,7200]]},
+ {g:'Mode manuel',f:[
+  ['manPeriodS','Période manuel','s',30,30,7200],['manFanOnS','Ventilo ON manuel','s',10,0,7200],
+  ['manMistOnS','Brumisation ON manuel','s',10,0,7200]]},
+ {g:'Brumisation — VPD',f:[
+  ['mistUseVpd','Pilotée par VPD (0/1)',' ',1,0,1],
+  ['vpdMistHigh','VPD seuil haut','kPa',0.1,0.1,6],['vpdMistMid','VPD seuil moyen','kPa',0.1,0.1,6],
+  ['mistDeltaMinC','Delta min pour brumisation','°C',0.5,-30,30],['mistDeltaMaxC','Delta max pour brumisation','°C',0.5,-30,40]]},
+ {g:'Jour/nuit — lux & horaires',f:[
+  ['luxDay','Seuil lux jour','lx',50,0,20000],['luxNight','Seuil lux nuit','lx',50,0,20000],
+  ['dayStartHour','Début jour (secours horaire)','h',1,0,23],['dayEndHour','Fin jour (secours horaire)','h',1,0,23]]},
+ {g:'Sécurités',f:[
+  ['staleS','Délai avant FALLBACK','s',30,30,86400],['valveMaxOnS','Ouverture continue max vanne','s',10,1,3600]]},
+ {g:'Énergie — calibration',f:[
+  ['busV','Tension du bus','V',1,5,60],
+  ['fan1RatedW','Ventilo 1 — puissance nominale','W',1,0,1000],['fan1RatedRpm','Ventilo 1 — régime nominal','tr/min',50,100,10000],
+  ['fan2RatedW','Ventilo 2 — puissance nominale','W',1,0,1000],['fan2RatedRpm','Ventilo 2 — régime nominal','tr/min',50,100,10000],
+  ['fanIdleW','Électronique ventilo au repos','W',0.5,0,50],
+  ['valveW','Bobine électrovanne','W',0.5,0,100],['baseW','ESP32 + écran + capteurs','W',0.5,0,100]]},
+ {g:'Télémétrie',f:[
+  ['publishPeriodS','Période de publication','s',10,10,3600]]}
 ];
 
 function buildSpUI(){
@@ -331,7 +324,7 @@ function fillSpUI(){
     const inp=$('sp-'+k);
     if(inp&&currentSp[k]!==undefined&&document.activeElement!==inp){inp.value=currentSp[k];inp.classList.remove('changed');}
   }));
-  set('sp-status','reçus de l\'ESP32 ('+new Date().toLocaleTimeString()+') — saison '+(currentSp.season||'?'));
+  set('sp-status','reçue de l\'ESP32 ('+new Date().toLocaleTimeString()+')');
   updateSpDiff();
 }
 function spDiff(){
@@ -356,14 +349,14 @@ function sendSetpoints(){
   const bounds={};SP_SCHEMA.forEach(g=>g.f.forEach(([k,,,,mn,mx])=>bounds[k]=[mn,mx]));
   const bad=Object.entries(ch).filter(([k,v])=>v<bounds[k][0]||v>bounds[k][1]).map(([k])=>k);
   if(bad.length){alert('Valeurs hors bornes (le firmware les rejetterait) : '+bad.join(', '));return;}
-  pub('setpoints/set',JSON.stringify(ch),1);
-  log('Setpoints envoyés : '+JSON.stringify(ch));
+  pub('config/set',JSON.stringify(ch),1);
+  log('Configuration envoyée : '+JSON.stringify(ch));
 }
 
 /* ════════ CONNEXION MQTT ════════ */
 let client=null, base='vgh/gh1', wantConn=false;
 let currentSp=null;
-let ota={active:false};
+let otaBusy=false;
 
 function toggleConn(){ if(client){wantConn=false;client.end(true);client=null;setWeb(false);$('btn-conn').textContent='Se connecter';} else connect(); }
 function setWeb(ok){$('dot-web').className='dot'+(ok?' live':'');set('st-web',ok?'connecté':'déconnecté');}
@@ -383,7 +376,7 @@ function connect(){
   });
   client.on('connect',()=>{
     setWeb(true);$('btn-conn').textContent='Se déconnecter';log('Connecté au broker.');
-    ['status','data','setpoints','cmd/resp','ota/status'].forEach(s=>client.subscribe(base+'/'+s,{qos:1}));
+    ['status','data','config','cmd/resp','ota'].forEach(s=>client.subscribe(base+'/'+s,{qos:1}));
   });
   client.on('message',onMessage);
   client.on('close',()=>{setWeb(false);if(!wantConn)return;});
@@ -399,25 +392,42 @@ function onMessage(topic,payload){
     try{
       const d=JSON.parse(payload.toString());
       const ls=$('lastseen');ls.style.display='';ls.textContent='Dernière donnée '+new Date().toLocaleTimeString();
-      const mb=$('sysmode');mb.textContent=d.sysMode||'--';mb.className='badge b-'+(d.sysMode?d.sysMode.toLowerCase():'standby');
-      set('season',d.season||'--');
+      const mb=$('sysmode');mb.textContent=d.mode||'--';mb.className='badge b-'+(d.mode?d.mode.toLowerCase():'standby');
     }catch(e){}
     return;
   }
-  if(t==='setpoints'){try{currentSp=JSON.parse(payload.toString());fillSpUI();}catch(e){}return;}
+  if(t==='config'){try{currentSp=JSON.parse(payload.toString());fillSpUI();}catch(e){}return;}
   if(t==='cmd/resp'){try{const r=JSON.parse(payload.toString());log('ESP32 : '+r.msg);}catch(e){log('ESP32 : '+payload.toString());}return;}
-  if(t==='ota/status'){onOtaStatus(payload.toString());return;}
+  if(t==='ota'){onOtaStatus(payload.toString());return;}
 }
 
-/* ════════ OTA ════════ */
-const OTA_DATA_BYTES=4092;
-const OTA_ACK_TIMEOUT=20000;
-
+/* ════════ OTA — upload sur ce site (Vercel Blob), puis l'ESP32 télécharge
+   lui-même le .bin depuis l'URL publique renvoyée. Plus de transfert par
+   chunks MQTT ni de vérification MD5 côté site : c'est httpUpdate côté
+   ESP32 qui s'en charge. ════════ */
 function otaSetStatus(msg,colr){const e=$('ota-status');e.textContent=msg;e.style.color=colr||'var(--tx)';}
 function otaProgress(p){$('ota-bar').style.width=(p*100).toFixed(1)+'%';}
 
+function uploadFirmware(buf,name,onProgress){
+  return new Promise((resolve,reject)=>{
+    const token=localStorage.getItem('vgh-api-token')||'';
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST','/api/upload?token='+encodeURIComponent(token)+'&name='+encodeURIComponent(name));
+    xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.upload.onprogress=(e)=>{ if(e.lengthComputable&&onProgress)onProgress(e.loaded/e.total); };
+    xhr.onload=()=>{
+      let r=null; try{r=JSON.parse(xhr.responseText);}catch(e){}
+      if(xhr.status>=200&&xhr.status<300&&r&&r.url) resolve(r.url);
+      else reject(new Error((r&&r.error)||('HTTP '+xhr.status)));
+    };
+    xhr.onerror=()=>reject(new Error('échec réseau pendant l\'envoi'));
+    xhr.send(buf);
+  });
+}
+
 async function otaStart(){
   if(!client||!client.connected){alert('Connecte-toi d\'abord au broker.');return;}
+  if(otaBusy)return;
   const f=$('ota-file').files[0];
   if(!f){alert('Choisis un fichier .bin.');return;}
   if(/\.(ino|cpp|c|h|hpp|zip)$/i.test(f.name)){
@@ -428,7 +438,6 @@ async function otaStart(){
     return;
   }
   if(!f.name.endsWith('.bin')){alert('Le fichier doit être un .bin exporté par Arduino IDE.');return;}
-  if(f.size<100000||f.size>3500000){if(!confirm('Taille inhabituelle ('+f.size+' octets). Continuer ?'))return;}
   const buf=new Uint8Array(await f.arrayBuffer());
   if(buf[0]!==0xE9){
     alert('Ce fichier n\'est pas une image ESP32 valide : il commence par '
@@ -436,57 +445,38 @@ async function otaStart(){
         + ' au lieu de 0xE9.\n\nReprends le .bin exporté par Arduino IDE.');
     return;
   }
-  const md5=SparkMD5.ArrayBuffer.hash(buf.buffer);
-  ota={active:true,buf,seq:0,total:Math.ceil(buf.length/OTA_DATA_BYTES),timer:null};
-  $('btn-ota').disabled=true;$('btn-ota-abort').disabled=false;
+  otaBusy=true;
+  $('btn-ota').disabled=true;
   otaProgress(0);
-  otaSetStatus('Initialisation… ('+(buf.length/1024).toFixed(0)+' Ko, '+ota.total+' chunks, MD5 '+md5.slice(0,8)+'…)');
-  armOtaTimeout();
-  pub('ota/ctrl',JSON.stringify({action:'begin',size:buf.length,md5}),1);
-  log('OTA begin : '+buf.length+' octets, MD5 '+md5);
-}
-function armOtaTimeout(){
-  clearTimeout(ota.timer);
-  ota.timer=setTimeout(()=>{ if(!ota.active)return;
-    otaFail('Pas de réponse de l\'ESP32 (20 s). Vérifie qu\'il est en ligne, puis réessaie.');
-    pub('ota/ctrl','{"action":"abort"}',1);
-  },OTA_ACK_TIMEOUT);
-}
-function otaSendChunk(i){
-  const off=i*OTA_DATA_BYTES;
-  const slice=ota.buf.subarray(off,off+OTA_DATA_BYTES);
-  const msg=new Uint8Array(4+slice.length);
-  msg[0]=(i>>>24)&255;msg[1]=(i>>>16)&255;msg[2]=(i>>>8)&255;msg[3]=i&255;
-  msg.set(slice,4);
-  client.publish(base+'/ota/data',msg,{qos:1});
-  armOtaTimeout();
+  otaSetStatus('Envoi du fichier vers le serveur… (0 %)');
+  try{
+    const url=await uploadFirmware(buf,f.name,(p)=>{otaProgress(p);otaSetStatus('Envoi du fichier vers le serveur… ('+Math.round(p*100)+' %)');});
+    log('OTA : fichier hébergé → '+url);
+    otaSetStatus('Fichier hébergé — demande de téléversement envoyée à l\'ESP32…');
+    pub('cmd',JSON.stringify({action:'ota',url}),1);
+  }catch(e){
+    otaFail('Échec de l\'envoi du fichier : '+e.message);
+  }
 }
 function onOtaStatus(raw){
   let s;try{s=JSON.parse(raw);}catch(e){return;}
-  if(!ota.active){ if(s.state==='error')log('OTA (ESP32) : '+(s.msg||'')); return; }
-  if(s.state==='ready'){ otaSetStatus('Transfert 0 / '+ota.total+' chunks…'); otaSendChunk(0); }
-  else if(s.state==='chunk'){
-    const next=s.ack+1;
-    otaProgress(s.received/ota.buf.length);
-    if(next<ota.total){ if(next%10===0)otaSetStatus('Transfert '+next+' / '+ota.total+' chunks…'); otaSendChunk(next); }
-    else{ otaSetStatus('Vérification et flash…'); armOtaTimeout(); pub('ota/ctrl','{"action":"end"}',1); }
+  if(s.state==='start'){ otaSetStatus('Téléchargement en cours sur l\'ESP32… (redémarrage automatique si tout se passe bien)'); }
+  else if(s.state==='ok'){
+    otaProgress(1);
+    otaSetStatus('✔ Téléchargement terminé — l\'ESP32 flashe et redémarre.','#1D9E75');
+    log('OTA réussi.'); otaBusy=false; $('btn-ota').disabled=false;
   }
-  else if(s.state==='success'){
-    clearTimeout(ota.timer);ota.active=false;otaProgress(1);
-    otaSetStatus('✔ Firmware flashé — l\'ESP32 redémarre. Il repasse en ligne dans ~30 s.','#1D9E75');
-    log('OTA réussi.');
-    $('btn-ota').disabled=false;$('btn-ota-abort').disabled=true;
+  else if(s.state==='no_update'){
+    otaSetStatus('L\'ESP32 indique que ce firmware est déjà installé.','var(--wn)');
+    log('OTA : aucune mise à jour nécessaire.'); otaBusy=false; $('btn-ota').disabled=false;
   }
-  else if(s.state==='error'){ otaFail('Erreur ESP32 : '+(s.msg||'inconnue')); }
-  else if(s.state==='aborted'){ otaFail('Transfert annulé.'); }
+  else if(s.state==='error'){ otaFail('Erreur ESP32'+(s.code!==undefined?' (code '+s.code+')':'')+'.'); }
 }
 function otaFail(msg){
-  clearTimeout(ota.timer);ota.active=false;
   otaSetStatus('✘ '+msg+' — l\'ancien firmware reste actif. Tu peux relancer le téléversement.','#E24B4A');
   log('OTA : '+msg);
-  $('btn-ota').disabled=false;$('btn-ota-abort').disabled=true;
+  otaBusy=false; $('btn-ota').disabled=false;
 }
-function otaAbort(){ if(!ota.active)return; pub('ota/ctrl','{"action":"abort"}',1); otaFail('Annulé par l\'utilisateur.'); }
 
 /* ════════ INIT ════════ */
 try{

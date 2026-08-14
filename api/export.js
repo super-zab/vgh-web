@@ -37,16 +37,19 @@ export default async function handler(req, res) {
       ? await sql`
           SELECT ts, type, label, detail
           FROM activity_log
-          WHERE gh = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
+          WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
           ORDER BY ts`
       : await sql`
-          SELECT ts, temp_c, humidity, leaf_temp_c, leaf_delta_c, dew_point_c,
-                 vpd_kpa, lux, uv_index, amg_max_c, amg_avg_c, fan_pct, fan_pwm,
-                 valve, valve_reason, day_mode, condensation_risk, season,
-                 sys_mode, severity, water_budget_pct, valve_run_ms, fan_run_ms,
-                 uptime_ms, free_heap, record_type
-          FROM telemetry
-          WHERE gh = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
+          SELECT ts, mode, is_day, delta_t, vpd,
+                 temp_in, rh_in, temp_out, rh_out, dew_point_c,
+                 co2_in, co2_out, lux_in, lux_out, uv_in, uv_out,
+                 leaf_amg_max_c, leaf_amg_avg_c, leaf_probe_c, witness_c, leaf_air_delta_c,
+                 fan, fan_reason, mist, mist_reason,
+                 period_s, fan_on_s, mist_on_s, fan_run_s, valve_run_s,
+                 rpm1, rpm2, power_w, energy_wh_today, energy_wh_total,
+                 severity, reason
+          FROM readings
+          WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
           ORDER BY ts
           LIMIT 100000`;
 

@@ -1,9 +1,10 @@
 /* GET /api/history?from=…&to=…&gh=gh1&resolution=auto&token=…
  *
- * Renvoie la télémétrie sur une plage de temps.
- * Au-delà de 3 jours, bascule automatiquement sur les moyennes horaires
- * (vue telemetry_hourly) pour ne pas transférer 100 000 lignes au
- * navigateur. Forçable via resolution=raw | hourly.                     */
+ * Renvoie la télémétrie sur une plage de temps (firmware V5 — table
+ * `readings`). Au-delà de 3 jours, bascule automatiquement sur les
+ * moyennes horaires (vue readings_hourly) pour ne pas transférer des
+ * dizaines de milliers de lignes au navigateur. Forçable via
+ * resolution=raw | hourly.                                              */
 
 import { sql, denied, range } from './_db.js';
 
@@ -17,23 +18,27 @@ export default async function handler(req, res) {
 
     if (hourly) {
       const rows = await sql`
-        SELECT hour AS ts, n, temp_c, temp_min_c, temp_max_c, humidity,
-               vpd_kpa, vpd_max_kpa, leaf_temp_c, leaf_delta_c, dew_point_c,
-               lux, lux_max, uv_index, amg_max_c, fan_pct, fan_max_pct,
-               valve_open_pct, water_budget_min_pct
-        FROM telemetry_hourly
-        WHERE gh = ${gh} AND hour >= ${from.toISOString()} AND hour <= ${to.toISOString()}
+        SELECT hour AS ts, n, temp_in, temp_min_in, temp_max_in, rh_in,
+               vpd, vpd_max, leaf_air_delta_c, dew_point_c,
+               lux_in, lux_max, uv_in, leaf_amg_max_c,
+               fan_on_pct, mist_on_pct, power_w, energy_wh_today
+        FROM readings_hourly
+        WHERE device_id = ${gh} AND hour >= ${from.toISOString()} AND hour <= ${to.toISOString()}
         ORDER BY hour`;
       return res.status(200).json({ resolution: 'hourly', count: rows.length, rows });
     }
 
     const rows = await sql`
-      SELECT ts, temp_c, humidity, leaf_temp_c, leaf_delta_c, dew_point_c,
-             vpd_kpa, lux, uv_index, amg_max_c, amg_avg_c, fan_pct, fan_pwm,
-             valve, valve_reason, day_mode, condensation_risk, season,
-             sys_mode, severity, water_budget_pct, record_type, changed_fields
-      FROM telemetry
-      WHERE gh = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
+      SELECT ts, mode, is_day, delta_t, vpd,
+             temp_in, rh_in, temp_out, rh_out, dew_point_c,
+             co2_in, co2_out, lux_in, lux_out, uv_in, uv_out,
+             leaf_amg_max_c, leaf_amg_avg_c, leaf_probe_c, witness_c, leaf_air_delta_c,
+             fan, fan_reason, mist, mist_reason,
+             period_s, fan_on_s, mist_on_s, fan_run_s, valve_run_s,
+             rpm1, rpm2, power_w, energy_wh_today, energy_wh_total,
+             severity, reason
+      FROM readings
+      WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
       ORDER BY ts
       LIMIT 20000`;
     res.status(200).json({ resolution: 'raw', count: rows.length, rows });
