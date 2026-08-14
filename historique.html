@@ -347,6 +347,12 @@ async function load() {
       fetch('/api/events?' + p),
     ]);
     if (!hRes.ok) throw new Error((await hRes.json()).error || `Erreur ${hRes.status}`);
+
+    // Jeton valide : révèle le pilotage (Connexion/Commandes/Setpoints/OTA/Journal)
+    // indépendamment de la présence de données télémétrie sur la période choisie —
+    // sinon une période vide masquerait le pilotage même avec le bon jeton.
+    ['s-conn','s-cmd','s-sp','s-ota','s-jlog'].forEach((id) => $(id).style.display = '');
+
     const hist = await hRes.json();
     const events = eRes.ok ? await eRes.json() : { activity: [] };
 
@@ -450,8 +456,7 @@ function render(hist) {
     line('Budget eau (%)',   col(hourly ? 'water_budget_min_pct' : 'water_budget_pct'), '#e05252'),
   ], { y: { min: 0, max: 105 } });
 
-  ['s-summary','s-charts','s-charts2','s-charts3','s-charts4','s-conn','s-cmd','s-sp','s-ota','s-jlog']
-    .forEach((id) => $(id).style.display = '');
+  ['s-summary','s-charts','s-charts2','s-charts3','s-charts4'].forEach((id) => $(id).style.display = '');
 }
 
 // ── Journal des consignes ─────────────────────────────────────────────
