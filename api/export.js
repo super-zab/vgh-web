@@ -39,8 +39,10 @@ export default async function handler(req, res) {
           FROM activity_log
           WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
           ORDER BY ts`
+      // ts (RTC) est NULL tant qu'il ne répond pas : on filtre/trie sur
+      // received_at (horodatage serveur) dans ce cas, voir api/history.js.
       : await sql`
-          SELECT ts, mode, is_day, delta_t, vpd,
+          SELECT ts, received_at, mode, is_day, delta_t, vpd,
                  temp_in, rh_in, temp_out, rh_out, dew_point_c,
                  co2_in, co2_out, lux_in, lux_out, uv_in, uv_out,
                  leaf_amg_max_c, leaf_amg_avg_c, leaf_probe_c, witness_c, leaf_air_delta_c,
@@ -49,8 +51,10 @@ export default async function handler(req, res) {
                  rpm1, rpm2, power_w, energy_wh_today, energy_wh_total,
                  severity, reason, uptime_s
           FROM readings
-          WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
-          ORDER BY ts
+          WHERE device_id = ${gh}
+            AND COALESCE(ts, received_at) >= ${from.toISOString()}
+            AND COALESCE(ts, received_at) <= ${to.toISOString()}
+          ORDER BY COALESCE(ts, received_at)
           LIMIT 100000`;
 
     const body = '﻿' + toCsv(rows);            // BOM pour Excel

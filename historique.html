@@ -275,10 +275,14 @@ function render(hist) {
     : `${rows.length} points · mesure par mesure`;
   $('npoints').textContent = hourly ? 'moyennes horaires' : 'mesures brutes';
 
+  // Horodatage effectif : ts (RTC) si dispo, sinon received_at (heure serveur) —
+  // le RTC ne répond pas encore sur ce prototype, ts est alors toujours NULL.
+  const effTs = (r) => r.ts || r.received_at;
+
   // Étiquettes : on omet la date quand la période tient dans une journée.
-  const span = new Date(rows.at(-1).ts) - new Date(rows[0].ts);
+  const span = new Date(effTs(rows.at(-1))) - new Date(effTs(rows[0]));
   const labels = rows.map((r) => {
-    const d = new Date(r.ts);
+    const d = new Date(effTs(r));
     return span > 36 * 3600e3
       ? `${pad(d.getDate())}/${pad(d.getMonth()+1)} ${pad(d.getHours())}h`
       : `${pad(d.getHours())}:${pad(d.getMinutes())}`;

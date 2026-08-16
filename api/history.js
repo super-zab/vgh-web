@@ -28,8 +28,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ resolution: 'hourly', count: rows.length, rows });
     }
 
+    /* ts vient du RTC embarqué : NULL tant qu'il ne répond pas (cas courant
+     * sur ce prototype, voir README §4.2). On filtre et trie alors sur
+     * received_at (horodatage serveur, toujours renseigné) — sinon ces
+     * lignes disparaissent silencieusement de toute plage de dates. */
     const rows = await sql`
-      SELECT ts, mode, is_day, delta_t, vpd,
+      SELECT ts, received_at, mode, is_day, delta_t, vpd,
              temp_in, rh_in, temp_out, rh_out, dew_point_c,
              co2_in, co2_out, lux_in, lux_out, uv_in, uv_out,
              leaf_amg_max_c, leaf_amg_avg_c, leaf_probe_c, witness_c, leaf_air_delta_c,
@@ -38,8 +42,10 @@ export default async function handler(req, res) {
              rpm1, rpm2, power_w, energy_wh_today, energy_wh_total,
              severity, reason, uptime_s
       FROM readings
-      WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
-      ORDER BY ts
+      WHERE device_id = ${gh}
+        AND COALESCE(ts, received_at) >= ${from.toISOString()}
+        AND COALESCE(ts, received_at) <= ${to.toISOString()}
+      ORDER BY COALESCE(ts, received_at)
       LIMIT 20000`;
     res.status(200).json({ resolution: 'raw', count: rows.length, rows });
 
