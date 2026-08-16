@@ -275,9 +275,12 @@ function render(hist) {
     : `${rows.length} points · mesure par mesure`;
   $('npoints').textContent = hourly ? 'moyennes horaires' : 'mesures brutes';
 
-  // Horodatage effectif : ts (RTC) si dispo, sinon received_at (heure serveur) —
-  // le RTC ne répond pas encore sur ce prototype, ts est alors toujours NULL.
-  const effTs = (r) => r.ts || r.received_at;
+  // Horodatage effectif : toujours received_at (heure serveur), jamais ts
+  // (RTC embarqué) — ts peut être NULL (RTC muet) ou réglé sur une heure/
+  // fuseau erroné (vu en pratique un décalage de +2h). received_at ne
+  // dépend jamais de l'horloge de l'appareil, contrairement à l'API qui
+  // filtre déjà dessus : ce helper garde juste l'affichage cohérent.
+  const effTs = (r) => r.received_at || r.ts;
 
   // Étiquettes : on omet la date quand la période tient dans une journée.
   const span = new Date(effTs(rows.at(-1))) - new Date(effTs(rows[0]));

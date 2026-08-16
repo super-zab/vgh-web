@@ -28,10 +28,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ resolution: 'hourly', count: rows.length, rows });
     }
 
-    /* ts vient du RTC embarqué : NULL tant qu'il ne répond pas (cas courant
-     * sur ce prototype, voir README §4.2). On filtre et trie alors sur
-     * received_at (horodatage serveur, toujours renseigné) — sinon ces
-     * lignes disparaissent silencieusement de toute plage de dates. */
+    /* On filtre et trie sur received_at (horodatage serveur), jamais sur ts
+     * (RTC embarqué) : ts peut être NULL (RTC muet, voir README §4.2) ou,
+     * pire, non-NULL mais réglé sur une heure/fuseau erroné (vu en
+     * pratique : décalage de +2h) — dans les deux cas, filtrer dessus ferait
+     * disparaître silencieusement des lignes pourtant bien dans la plage.
+     * received_at ne dépend jamais de l'horloge de l'appareil. */
     const rows = await sql`
       SELECT ts, received_at, mode, is_day, delta_t, vpd,
              temp_in, rh_in, temp_out, rh_out, dew_point_c,
@@ -43,9 +45,9 @@ export default async function handler(req, res) {
              severity, reason, uptime_s
       FROM readings
       WHERE device_id = ${gh}
-        AND COALESCE(ts, received_at) >= ${from.toISOString()}
-        AND COALESCE(ts, received_at) <= ${to.toISOString()}
-      ORDER BY COALESCE(ts, received_at)
+        AND received_at >= ${from.toISOString()}
+        AND received_at <= ${to.toISOString()}
+      ORDER BY received_at
       LIMIT 20000`;
     res.status(200).json({ resolution: 'raw', count: rows.length, rows });
 
