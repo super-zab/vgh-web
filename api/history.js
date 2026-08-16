@@ -36,7 +36,7 @@ export default async function handler(req, res) {
              fan, fan_reason, mist, mist_reason,
              period_s, fan_on_s, mist_on_s, fan_run_s, valve_run_s,
              rpm1, rpm2, power_w, energy_wh_today, energy_wh_total,
-             severity, reason
+             severity, reason, uptime_s
       FROM readings
       WHERE device_id = ${gh} AND ts >= ${from.toISOString()} AND ts <= ${to.toISOString()}
       ORDER BY ts
