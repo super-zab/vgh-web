@@ -235,6 +235,13 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
     <button onclick="cmd({action:'rescan'})">Redétecter capteurs</button>
   </div>
   <div class="row" style="margin-top:11px">
+    <span style="color:var(--mt);font-size:12px">Écran / diagnostic</span>
+    <button onclick="cmd({action:'diag'})">Diagnostic carte</button>
+    <button onclick="cmd({action:'display'})">Réinitialiser l'écran</button>
+    <button onclick="cmd({action:'tftTest'})">Mire écran</button>
+    <span style="font-size:11px;color:var(--mt)">Réponses dans le journal de session, en bas de page.</span>
+  </div>
+  <div class="row" style="margin-top:11px">
     <span style="color:var(--mt);font-size:12px">Tampon SD</span>
     <button onclick="cmd({action:'flushSpool'})">Rejouer le tampon</button>
     <button class="btn-danger" onclick="if(confirm('Effacer définitivement le tampon SD non envoyé ?'))cmd({action:'dropSpool'})">Vider le tampon</button>
