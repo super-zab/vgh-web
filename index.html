@@ -101,6 +101,15 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
 .zrow .bar i{display:block;height:100%;background:var(--ac);border-radius:3px;transition:width .3s;}
 .zrow .v{text-align:right;font-size:17px;font-weight:600;letter-spacing:-.01em;}
 .zrow .v small{font-size:10px;color:var(--mt);font-weight:400;margin-left:2px;}
+.zrow.aside{border-style:dashed;opacity:.8;}
+.zrow.aside .n{background:#24282d;color:var(--mt);}
+.zrow.trio{grid-template-columns:26px 1fr auto;}
+.trios{display:flex;gap:14px;}
+.trios .stat{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:62px;}
+.trios .sl{font-size:9.5px;color:var(--mt2);text-transform:uppercase;letter-spacing:.06em;}
+.trios .sv{font-size:16px;font-weight:600;letter-spacing:-.01em;}
+.trios .sv small{font-size:10px;color:var(--mt);font-weight:400;margin-left:2px;}
+@media(max-width:640px){.trios{gap:9px;}.trios .stat{min-width:52px;}}
 .zp-note{font-size:11px;color:var(--mt2);margin-top:10px;line-height:1.5;}
 .formula{font-size:10px;color:var(--mt2);margin-top:5px;font-family:ui-monospace,'SF Mono',monospace;}
 
@@ -341,13 +350,13 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <text class="znum" x="654" y="438">2</text>
   <line class="zpin" x1="662" y1="435" x2="670" y2="435"/>
   <text class="zval" x="672" y="430" text-anchor="start"><tspan id="zs-temp-2">--</tspan> <tspan class="cuni">°C</tspan></text>
-  <text class="zloc" x="672" y="440" text-anchor="start">Intérieur · bas 1</text>
+  <text class="zloc" x="672" y="440" text-anchor="start">Intérieur · bas</text>
   <circle class="zring" cx="510" cy="342" r="7"/>
   <circle class="zdot" cx="510" cy="342" r="8"/>
   <text class="znum" x="510" y="345">3</text>
   <line class="zpin" x1="502" y1="342" x2="494" y2="342"/>
   <text class="zval" x="492" y="338" text-anchor="end"><tspan id="zs-temp-3">--</tspan> <tspan class="cuni">°C</tspan></text>
-  <text class="zloc" x="492" y="348" text-anchor="end">Intérieur · bas 2</text>
+  <text class="zloc" x="492" y="348" text-anchor="end">Boîtier électronique</text>
   <circle class="zring" cx="655" cy="20" r="7"/>
   <circle class="zdot" cx="655" cy="20" r="8"/>
   <text class="znum" x="655" y="23">4</text>
@@ -373,13 +382,13 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <text class="znum" x="654" y="438">2</text>
   <line class="zpin" x1="662" y1="435" x2="670" y2="435"/>
   <text class="zval" x="672" y="430" text-anchor="start"><tspan id="zs-rh-2">--</tspan> <tspan class="cuni">%</tspan></text>
-  <text class="zloc" x="672" y="440" text-anchor="start">Intérieur · bas 1</text>
+  <text class="zloc" x="672" y="440" text-anchor="start">Intérieur · bas</text>
   <circle class="zring" cx="510" cy="342" r="7"/>
   <circle class="zdot" cx="510" cy="342" r="8"/>
   <text class="znum" x="510" y="345">3</text>
   <line class="zpin" x1="502" y1="342" x2="494" y2="342"/>
   <text class="zval" x="492" y="338" text-anchor="end"><tspan id="zs-rh-3">--</tspan> <tspan class="cuni">%</tspan></text>
-  <text class="zloc" x="492" y="348" text-anchor="end">Intérieur · bas 2</text>
+  <text class="zloc" x="492" y="348" text-anchor="end">Boîtier électronique</text>
   <circle class="zring" cx="655" cy="20" r="7"/>
   <circle class="zdot" cx="655" cy="20" r="8"/>
   <text class="znum" x="655" y="23">4</text>
@@ -441,13 +450,13 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <text class="znum" x="565" y="413">1</text>
   <line class="zpin" x1="573" y1="410" x2="581" y2="410"/>
   <text class="zval" x="583" y="406" text-anchor="start"><tspan id="zs-amg-1">--</tspan> <tspan class="cuni">°C</tspan></text>
-  <text class="zloc" x="583" y="416" text-anchor="start">Caméra 1</text>
+  <text class="zloc" x="583" y="416" text-anchor="start">Canopée 1 · min <tspan id="zs-amgmin-1">--</tspan> / moy <tspan id="zs-amgavg-1">--</tspan></text>
   <circle class="zring" cx="490" cy="330" r="7"/>
   <circle class="zdot" cx="490" cy="330" r="8"/>
   <text class="znum" x="490" y="333">2</text>
   <line class="zpin" x1="482" y1="330" x2="474" y2="330"/>
   <text class="zval" x="472" y="326" text-anchor="end"><tspan id="zs-amg-2">--</tspan> <tspan class="cuni">°C</tspan></text>
-  <text class="zloc" x="472" y="336" text-anchor="end">Caméra 2</text>
+  <text class="zloc" x="472" y="336" text-anchor="end">Canopée 2 · min <tspan id="zs-amgmin-2">--</tspan> / moy <tspan id="zs-amgavg-2">--</tspan></text>
 </g>
 <g class="zg" id="zg-fan" style="display:none">
   <circle class="zring" cx="819" cy="364" r="7"/>
@@ -520,7 +529,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <rect class="cbox" x="26" y="112" width="186" height="64" rx="10"/>
   <text class="ctit" x="40" y="131">TEMPÉRATURE</text>
   <text class="cval" x="40" y="156"><tspan id="sv-temp">--</tspan><tspan class="cuni"> °C</tspan></text>
-  <text class="cnot" x="40" y="169" id="sv-tempnote">5× SHT45 · delta int/ext -- °C</text>
+  <text class="cnot" x="40" y="169" id="sv-tempnote">4× SHT45 serre + boîtier · delta int/ext -- °C</text>
   <g class="cbadge"><rect x="170" y="123" width="30" height="17" rx="8"/><text x="185" y="135">×5</text></g>
 </g>
 <g class="co clickable" id="co-rh" data-zoom="rh" tabindex="0" role="button">
@@ -530,7 +539,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <rect class="cbox" x="26" y="208" width="186" height="64" rx="10"/>
   <text class="ctit" x="40" y="227">HUMIDITÉ</text>
   <text class="cval" x="40" y="252"><tspan id="sv-rh">--</tspan><tspan class="cuni"> %</tspan></text>
-  <text class="cnot" x="40" y="265">5× SHT45 · mêmes boîtiers</text>
+  <text class="cnot" x="40" y="265">4× SHT45 serre + boîtier électronique</text>
   <g class="cbadge"><rect x="170" y="219" width="30" height="17" rx="8"/><text x="185" y="231">×5</text></g>
 </g>
 <g class="co clickable" id="co-lux" data-zoom="lux" tabindex="0" role="button">
@@ -570,7 +579,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <rect class="cbox" x="962" y="208" width="186" height="64" rx="10"/>
   <text class="ctit" x="976" y="227">CANOPÉE</text>
   <text class="cval" x="976" y="252"><tspan id="sv-amg">--</tspan><tspan class="cuni"> °C</tspan></text>
-  <text class="cnot" x="976" y="265" id="sv-amgnote">AMG8833 · moyenne -- °C</text>
+  <text class="cnot" x="976" y="265" id="sv-amgnote">2× AMG8833 · min -- / moy -- / max -- °C</text>
 </g>
 <g class="co clickable" id="co-fan" data-zoom="fan" tabindex="0" role="button">
   <polyline class="lead" points="962,336 932,336 819,364"/>
@@ -714,11 +723,16 @@ const META = {
   "view": [460, 0, 540, 480],
   "locs": [
    "Intérieur · haut",
-   "Intérieur · bas 1",
-   "Intérieur · bas 2",
+   "Intérieur · bas",
+   "Boîtier électronique",
    "Extérieur · haut",
    "Extérieur · bas"
-  ]
+  ],
+  /* CH4 mesure l'air DANS le coffret : il pilote les ventilateurs de
+     boîtier et n'entre pas dans la moyenne serre (cf. IN_PRIORITY du
+     firmware, qui ne retient que CH2 et CH3). */
+  "aside": 2,
+  "note": "La valeur du schéma est la moyenne des deux capteurs intérieurs de la serre (haut et bas). Le boîtier électronique est mesuré à part : il sert uniquement à déclencher ses propres ventilateurs de coffret."
  },
  "rh": {
   "title": "Humidité relative",
@@ -730,11 +744,13 @@ const META = {
   "view": [460, 0, 540, 480],
   "locs": [
    "Intérieur · haut",
-   "Intérieur · bas 1",
-   "Intérieur · bas 2",
+   "Intérieur · bas",
+   "Boîtier électronique",
    "Extérieur · haut",
    "Extérieur · bas"
-  ]
+  ],
+  "aside": 2,
+  "note": "La valeur du schéma est la moyenne des deux capteurs intérieurs de la serre (haut et bas). Le boîtier électronique est mesuré à part : son humidité déclenche la purge anti-condensation du coffret."
  },
  "lux": {
   "title": "Éclairement",
@@ -775,6 +791,8 @@ const META = {
    "Extérieur"
   ]
  },
+ /* Chaque caméra thermique renvoie déjà min / moy / max sur ses 64 pixels :
+    on affiche les trois par capteur, pas seulement le point le plus chaud. */
  "amg": {
   "title": "Température canopée",
   "sensor": "AMG8833",
@@ -782,10 +800,11 @@ const META = {
   "key": "leafAmgMaxC",
   "arr": "amg_all",
   "dec": 1,
+  "stats": true,
   "view": [322, 260, 411, 220],
   "locs": [
-   "Caméra 1",
-   "Caméra 2"
+   "Canopée 1",
+   "Canopée 2"
   ]
  },
  "leaf": {
@@ -849,11 +868,14 @@ function updateScene(d){
   }
   const amg0=Array.isArray(d.amg)?d.amg[0]:null, amg1=Array.isArray(d.amg)?d.amg[1]:null;
   d.amg_all = [amg0?amg0.maxC:null, amg1?amg1.maxC:null];
+  /* min / moyenne / max par caméra — le firmware les publie déjà pour
+     chaque AMG8833 dans amg[], on ne recalcule rien ici. */
+  d.amg_stats = [amg0,amg1].map(a=>a?{minC:a.minC,avgC:a.avgC,maxC:a.maxC,state:a.state,loc:a.loc}:null);
   d.fan_all = [d.rpm1, d.rpm2];
   d.rpmAvg  = (d.rpm1!=null&&d.rpm2!=null)?(d.rpm1+d.rpm2)/2:(d.rpm1!=null?d.rpm1:d.rpm2);
 
   setTxt('sv-temp', fnum(d.tempIn,1), d.tempIn==null?'#8b929b':d.tempIn>=36?'#e05252':d.tempIn>=32?'#e79a2b':'#25a97e');
-  setTxt('sv-tempnote','5× SHT45 · delta int/ext '+fnum(d.deltaT,1)+' °C');
+  setTxt('sv-tempnote','4× SHT45 serre + boîtier · delta int/ext '+fnum(d.deltaT,1)+' °C');
   setTxt('sv-rh',  fnum(d.rhIn,0), d.rhIn>85?'#e79a2b':d.rhIn<30?'#3d8fe0':'#25a97e');
   setTxt('sv-lux', d.luxIn==null?'--':Math.round(d.luxIn).toLocaleString('fr-FR'), '#3d8fe0');
   setTxt('sv-luxnote','2× LTR390 · mode '+(d.isDay?'jour':'nuit'));
@@ -861,7 +883,12 @@ function updateScene(d){
   setTxt('sv-co2', d.co2In==null?'--':Math.round(d.co2In), d.co2In>1200?'#e79a2b':'#25a97e');
   setTxt('sv-co2note','2× SCD41 · extérieur '+(d.co2Out==null?'--':Math.round(d.co2Out))+' ppm');
   setTxt('sv-amg', fnum(d.leafAmgMaxC,1), d.leafAmgMaxC==null?'#8b929b':d.leafAmgMaxC>=40?'#e05252':d.leafAmgMaxC>=36?'#e79a2b':'#25a97e');
-  setTxt('sv-amgnote','2× AMG8833 · moyenne '+fnum(d.leafAmgAvgC,1)+' °C');
+  setTxt('sv-amgnote','2× AMG8833 · min '+fnum(d.leafAmgMinC,1)
+        +' / moy '+fnum(d.leafAmgAvgC,1)+' / max '+fnum(d.leafAmgMaxC,1)+' °C');
+  d.amg_stats.forEach((a,i)=>{
+    setTxt('zs-amgmin-'+(i+1), a&&a.minC!=null?Number(a.minC).toFixed(1):'--');
+    setTxt('zs-amgavg-'+(i+1), a&&a.avgC!=null?Number(a.avgC).toFixed(1):'--');
+  });
 
   updateProbeDots(d);
   const probes=orderedProbes(d);
@@ -987,11 +1014,41 @@ function renderProbePanel(){
     : 'Aucune sonde détectée pour l\'instant.';
   $('zpanel').hidden=false;
 }
+/* Capteurs qui renvoient une statistique par capteur (min / moyenne / max)
+   plutôt qu'une valeur unique : une caméra thermique voit 64 pixels, la
+   réduire à son point le plus chaud fait perdre l'écart dans la canopée. */
+function renderStatsPanel(id){
+  const m=META[id], d=lastData||{};
+  const st=Array.isArray(d.amg_stats)?d.amg_stats:[];
+  $('zp-title').textContent=m.title;
+  const mins=st.filter(a=>a&&a.minC!=null).map(a=>a.minC);
+  const maxs=st.filter(a=>a&&a.maxC!=null).map(a=>a.maxC);
+  $('zp-meta').textContent=m.locs.length+' × '+m.sensor+' · max serre '
+    +(d.leafAmgMaxC==null?'--':Number(d.leafAmgMaxC).toFixed(m.dec))+' '+m.unit;
+  $('zp-spread').textContent=(mins.length&&maxs.length)
+    ? 'étendue globale '+(Math.max(...maxs)-Math.min(...mins)).toFixed(m.dec)+' '+m.unit : '';
+  $('zp-rows').innerHTML=m.locs.map((loc,i)=>{
+    const a=st[i];
+    const cell=(v,lbl)=>'<div class="stat"><span class="sl">'+lbl+'</span><span class="sv">'
+      +(a&&v!=null?Number(v).toFixed(m.dec):'--')+'<small>'+m.unit+'</small></span></div>';
+    const bad=a&&a.state&&a.state!=='ok';
+    return '<div class="zrow trio"><div class="n">'+(i+1)+'</div>'
+      +'<div><div class="loc">'+loc+(bad?' · '+a.state:(a&&a.loc?' · '+a.loc:''))+'</div></div>'
+      +'<div class="trios">'+cell(a&&a.minC,'min')+cell(a&&a.avgC,'moy')+cell(a&&a.maxC,'max')+'</div></div>';
+  }).join('');
+  $('zp-note').textContent='Chaque AMG8833 mesure une grille de 64 points : le minimum et le maximum '
+    +'donnent l\'écart thermique dans son champ, la moyenne l\'état général de la zone. '
+    +'La valeur affichée sur le schéma est le point le plus chaud de toute la canopée.';
+  $('zpanel').hidden=false;
+}
 function renderPanel(id){
   if(id==='leaf'){ renderProbePanel(); return; }
+  if(META[id]&&META[id].stats){ renderStatsPanel(id); return; }
   const m=META[id], d=lastData||{}, arr=d[m.arr];
   const vals=m.locs.map((_,i)=>Array.isArray(arr)?arr[i]:null);
-  const ok=vals.filter(v=>v!=null&&!isNaN(v));
+  // Un capteur « aside » (boîtier électronique) ne décrit pas l'ambiance de la
+  // serre : il est exclu de l'étendue et de l'échelle des barres.
+  const ok=vals.filter((v,i)=>v!=null&&!isNaN(v)&&i!==m.aside);
   const mn=ok.length?Math.min(...ok):null, mx=ok.length?Math.max(...ok):null;
   const avg=d[m.key];
   $('zp-title').textContent=m.title;
@@ -1001,18 +1058,22 @@ function renderPanel(id){
     +' · min '+mn.toFixed(m.dec)+' / max '+mx.toFixed(m.dec);
   const rows=m.locs.map((loc,i)=>{
     const v=vals[i];
-    const pct=(ok.length>1&&v!=null)?Math.round((v-mn)/((mx-mn)||1)*100):(v!=null?100:0);
+    const pct=(ok.length>1&&v!=null)
+      ?Math.max(0,Math.min(100,Math.round((v-mn)/((mx-mn)||1)*100))):(v!=null?100:0);
     const hot=(v!=null&&mx!=null&&v===mx&&ok.length>1);
-    return '<div class="zrow"><div class="n">'+(i+1)+'</div>'
-      +'<div><div class="loc">'+loc+(hot?' · point le plus élevé':'')+'</div>'
+    /* « aside » = capteur hors moyenne (le boîtier électronique) : il est
+       listé, mais signalé pour qu'on ne le lise pas comme un point de la serre. */
+    const off=(m.aside===i);
+    return '<div class="zrow'+(off?' aside':'')+'"><div class="n">'+(i+1)+'</div>'
+      +'<div><div class="loc">'+loc+(off?' · hors moyenne serre':(hot?' · point le plus élevé':''))+'</div>'
       +'<div class="bar"><i style="width:'+pct+'%"></i></div></div>'
       +'<div class="v">'+(v==null?'--':Number(v).toFixed(m.dec))
       +'<small>'+m.unit+'</small></div></div>';
   }).join('');
   $('zp-rows').innerHTML=rows;
-  $('zp-note').textContent=Array.isArray(arr)?
-    'La valeur du schéma est la moyenne de ces '+m.locs.length+' capteurs.'
-    :'Le firmware ne publie pas encore le détail par capteur (clé « '+m.arr+' ») — seules les moyennes remontent.';
+  $('zp-note').textContent=!Array.isArray(arr)
+    ? 'Le firmware ne publie pas encore le détail par capteur (clé « '+m.arr+' ») — seules les moyennes remontent.'
+    : (m.note || 'La valeur du schéma est la moyenne de ces '+m.locs.length+' capteurs.');
   $('zpanel').hidden=false;
 }
 scene.addEventListener('click',e=>{
