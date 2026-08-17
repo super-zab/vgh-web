@@ -83,6 +83,22 @@ details .inner{padding:2px 14px 16px;}
 .bwrap{height:10px;background:#0f1113;border:1px solid var(--bd);border-radius:999px;overflow:hidden;margin:12px 0 8px;}
 .bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ok),var(--ac));width:0;transition:width .2s;}
 
+/* Suivi OTA pas à pas : le site ne voit pas la flash de l'ESP32, il ne peut
+   que reconstituer l'avancement à partir des messages MQTT — autant montrer
+   explicitement où on en est et ce qu'on attend. */
+.steps{list-style:none;margin-top:14px;display:grid;gap:8px;}
+.steps li{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.45;color:var(--mt2);}
+.steps li .k{width:14px;flex:none;text-align:center;font-weight:700;color:var(--mt2);}
+.steps li .d{display:block;font-size:11px;color:var(--mt2);margin-top:1px;}
+.steps li.act{color:var(--tx);} .steps li.act .k{color:var(--ac);}
+.steps li.done{color:var(--mt);} .steps li.done .k{color:var(--ok);}
+.steps li.fail{color:var(--cr);} .steps li.fail .k{color:var(--cr);}
+.steps li.warn{color:var(--wn);} .steps li.warn .k{color:var(--wn);}
+.otahead{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:13px;}
+.diag{margin-top:12px;padding:11px 13px;border-radius:9px;font-size:11.5px;line-height:1.55;
+ background:#1a1608;border:1px solid #3a3010;color:var(--wn);}
+.diag b{color:var(--tx);} .diag ul{margin:6px 0 0 16px;} .diag li{margin-top:3px;}
+
 #log{font-family:ui-monospace,'SF Mono',monospace;font-size:11px;color:var(--mt);background:#0f1113;
  border:1px solid var(--bd);border-radius:8px;padding:12px;max-height:170px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
 
@@ -202,12 +218,19 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
 <!-- ═══ OTA ═══ -->
 <section>
   <div class="sec-title">Mise à jour du firmware <span class="fill"></span><span class="aside">OTA</span></div>
+  <div class="otahead">
+    <span class="chip"><span class="dot" id="dot-fw"></span>Firmware embarqué&nbsp;<strong id="fw-running">inconnu</strong></span>
+    <span class="chip" id="chip-fwseen" hidden>dernier signe de vie&nbsp;<strong id="fw-seen">—</strong></span>
+  </div>
   <div class="row">
     <input type="file" id="ota-file" accept=".bin">
     <button class="btn-ok" id="btn-ota" onclick="otaStart()">Téléverser et lancer l'OTA</button>
+    <button id="btn-ota-stop" onclick="otaAbandon()" hidden>Arrêter le suivi</button>
   </div>
   <div class="bwrap"><div class="bar" id="ota-bar"></div></div>
   <div style="font-size:12px;color:var(--mt)" id="ota-status">Dans Arduino IDE : Croquis → Exporter les binaires compilées → choisir le fichier <b>.bin</b> (pas « merged ») du dossier build. Le fichier est d'abord hébergé sur ce site, puis l'ESP32 va le télécharger lui-même.</div>
+  <ol class="steps" id="ota-steps" hidden></ol>
+  <div class="diag" id="ota-diag" hidden></div>
   <div class="hint">⚠ Ne pas fermer cette page pendant l'envoi. En cas de succès, l'ESP32 redémarre seul ; en cas d'échec, l'ancienne partition reste active.</div>
 </section>
 
@@ -356,7 +379,6 @@ function sendSetpoints(){
 /* ════════ CONNEXION MQTT ════════ */
 let client=null, base='vgh/gh1', wantConn=false;
 let currentSp=null;
-let otaBusy=false;
 
 function toggleConn(){ if(client){wantConn=false;client.end(true);client=null;setWeb(false);$('btn-conn').textContent='Se connecter';} else connect(); }
 function setWeb(ok){$('dot-web').className='dot'+(ok?' live':'');set('st-web',ok?'connecté':'déconnecté');}
@@ -387,12 +409,13 @@ function cmd(o){ pub('cmd',JSON.stringify(o)); log('Commande : '+JSON.stringify(
 
 function onMessage(topic,payload){
   const t=topic.slice(base.length+1);
-  if(t==='status'){setEsp(payload.toString());return;}
+  if(t==='status'){const s=payload.toString();setEsp(s);otaOnStatus(s);return;}
   if(t==='data'){
     try{
       const d=JSON.parse(payload.toString());
       const ls=$('lastseen');ls.style.display='';ls.textContent='Dernière donnée '+new Date().toLocaleTimeString();
       const mb=$('sysmode');mb.textContent=d.mode||'--';mb.className='badge b-'+(d.mode?d.mode.toLowerCase():'standby');
+      otaOnData(d);
     }catch(e){}
     return;
   }
@@ -404,9 +427,98 @@ function onMessage(topic,payload){
 /* ════════ OTA — upload sur ce site (Vercel Blob), puis l'ESP32 télécharge
    lui-même le .bin depuis l'URL publique renvoyée. Plus de transfert par
    chunks MQTT ni de vérification MD5 côté site : c'est httpUpdate côté
-   ESP32 qui s'en charge. ════════ */
+   ESP32 qui s'en charge.
+
+   Le site ne voit jamais la flash de l'ESP32 : tout ce qu'il sait vient de
+   trois sources MQTT — <base>/ota (ce que le firmware raconte), <base>/status
+   (présence via le testament du broker) et <base>/data (le programme tourne
+   à nouveau). Le suivi ci-dessous les croise pour trancher entre les trois
+   issues — réussi / échoué / carte muette — au lieu d'afficher indéfiniment
+   le dernier message reçu.
+
+   Cas historique : un firmware qui appelle httpUpdate.rebootOnUpdate(true)
+   redémarre AVANT d'avoir pu publier {"state":"ok"}. Le dernier message vu
+   par le site est alors {"state":"start"}, alors que l'OTA a parfaitement
+   réussi. D'où l'inférence par redémarrage ci-dessous, qui rattrape aussi
+   les firmwares non corrigés déjà en place sur la carte. ════════ */
+
+const OTA_STEPS=[
+  ['Envoi du .bin vers ce site',
+   'le binaire est hébergé sur une URL publique que l\'ESP32 ira lire lui-même'],
+  ['Commande OTA transmise à l\'ESP32',
+   'publiée sur le topic cmd — l\'ESP32 doit accuser réception sur le topic ota'],
+  ['Téléchargement du binaire par l\'ESP32',
+   'l\'ESP32 lit le fichier en HTTPS et l\'écrit dans la partition OTA libre'],
+  ['Écriture terminée — redémarrage',
+   'la partition fraîchement écrite devient active au redémarrage'],
+  ['Retour en ligne du nouveau firmware',
+   'confirmé quand le programme se réannonce sur le broker']
+];
+// Délai au-delà duquel une étape est considérée comme silencieuse. L'étape 0
+// est bornée par la requête HTTP elle-même, la 4 par le retour de la carte.
+const OTA_TIMEOUTS=[null,25000,240000,120000,150000];
+
+let ota=null;              // null = aucun OTA en cours
+let fwRunning=null;        // firmware annoncé par la carte (champ fw)
+let fwSeenAt=0;
+
 function otaSetStatus(msg,colr){const e=$('ota-status');e.textContent=msg;e.style.color=colr||'var(--tx)';}
-function otaProgress(p){$('ota-bar').style.width=(p*100).toFixed(1)+'%';}
+function otaProgress(p){$('ota-bar').style.width=(Math.max(0,Math.min(1,p))*100).toFixed(1)+'%';}
+function fmtBytes(n){return n>=1e6?(n/1048576).toFixed(2)+' Mo':(n/1024).toFixed(0)+' Ko';}
+function fmtDur(ms){const s=Math.round(ms/1000);return s<60?s+' s':Math.floor(s/60)+' min '+String(s%60).padStart(2,'0')+' s';}
+
+/* Bandeau « firmware embarqué » — visible en permanence, pas seulement
+   pendant un OTA : c'est ce qui permet de voir tout de suite qu'on tourne
+   sur un firmware de test au lieu du firmware de production. */
+function setFwRunning(name){
+  if(name){ fwRunning=name; fwSeenAt=Date.now(); }
+  const known=!!fwRunning;
+  set('fw-running',known?fwRunning:'inconnu');
+  $('dot-fw').className='dot'+(known?' live':'');
+  $('chip-fwseen').hidden=!known;
+  if(known) set('fw-seen',new Date(fwSeenAt).toLocaleTimeString());
+}
+function otaOnData(d){
+  // Un firmware qui ne publie pas encore « fw » est identifié par son mode :
+  // le firmware de test publie mode "TEST", la serre publie AUTO/MANUEL/…
+  setFwRunning(d.fw||(d.mode==='TEST'?'firmware de test':(d.mode?'Greenhouse (mode '+d.mode+')':null)));
+  if(ota&&ota.sawStart&&ota.step>=2) otaRebootObserved('données reçues du firmware');
+}
+function otaOnStatus(s){
+  if(s==='online'&&ota&&ota.step>=2&&ota.sawStart) otaRebootObserved('l\'ESP32 s\'est réannoncé en ligne');
+  if(s==='offline'&&ota&&ota.step>=2){ ota.sawOffline=true; otaRender(); }
+}
+
+/* ── Rendu du suivi ── */
+function otaRender(){
+  const ol=$('ota-steps');
+  if(!ota){ ol.hidden=true; return; }
+  ol.hidden=false;
+  ol.innerHTML='';
+  OTA_STEPS.forEach((st,i)=>{
+    let cls='',k='·';
+    if(ota.failedAt===i){cls='fail';k='✘';}
+    else if(i<ota.step){cls='done';k='✔';}
+    else if(i===ota.step){cls=ota.stalled?'warn':'act';k=ota.stalled?'!':'⟳';}
+    const li=document.createElement('li');
+    li.className=cls;
+    const mark=document.createElement('span'); mark.className='k'; mark.textContent=k;
+    const body=document.createElement('span');
+    body.appendChild(document.createTextNode(st[0]));
+    const d=document.createElement('span'); d.className='d';
+    d.textContent=(i===ota.step&&ota.stepNote)?ota.stepNote:st[1];
+    body.appendChild(d);
+    li.appendChild(mark); li.appendChild(body);
+    ol.appendChild(li);
+  });
+}
+function otaDiag(html){const e=$('ota-diag');if(!html){e.hidden=true;return;}e.hidden=false;e.innerHTML=html;}
+function otaStep(i,note){
+  if(!ota)return;
+  ota.step=i; ota.stepNote=note||''; ota.stalled=false;
+  ota.stepStartedAt=Date.now();
+  otaRender();
+}
 
 function uploadFirmware(buf,name,onProgress){
   return new Promise((resolve,reject)=>{
@@ -427,7 +539,7 @@ function uploadFirmware(buf,name,onProgress){
 
 async function otaStart(){
   if(!client||!client.connected){alert('Connecte-toi d\'abord au broker.');return;}
-  if(otaBusy)return;
+  if(ota)return;
   const f=$('ota-file').files[0];
   if(!f){alert('Choisis un fichier .bin.');return;}
   if(/\.(ino|cpp|c|h|hpp|zip)$/i.test(f.name)){
@@ -445,40 +557,195 @@ async function otaStart(){
         + ' au lieu de 0xE9.\n\nReprends le .bin exporté par Arduino IDE.');
     return;
   }
-  otaBusy=true;
+  // Dernier garde-fou avant d'écraser la flash : le nom du fichier envoyé est
+  // la seule chose qui distingue un firmware de test du firmware de la serre,
+  // et l'erreur ne se voit qu'une fois la carte redémarrée. On le fait relire.
+  if(!confirm('Firmware à installer :\n\n    '+f.name+'   ('+fmtBytes(buf.length)+')\n\n'
+            + 'Cible : '+base+'\n'
+            + 'Firmware actuellement embarqué : '+(fwRunning||'inconnu')+'\n\n'
+            + 'Ce binaire va remplacer le programme de la carte. Confirmer ?')) return;
+
+  ota={step:0,failedAt:-1,stalled:false,stepNote:'',stepStartedAt:Date.now(),
+       startedAt:Date.now(),name:f.name,size:buf.length,url:null,
+       sawStart:false,sawOffline:false,fwBefore:fwRunning,done:false};
   $('btn-ota').disabled=true;
+  $('btn-ota-stop').hidden=false;
+  otaDiag(null);
   otaProgress(0);
+  otaRender();
+  ota.timer=setInterval(otaTick,1000);
+  log('OTA : envoi de '+f.name+' ('+fmtBytes(buf.length)+') vers '+base);
   otaSetStatus('Envoi du fichier vers le serveur… (0 %)');
   try{
-    const url=await uploadFirmware(buf,f.name,(p)=>{otaProgress(p);otaSetStatus('Envoi du fichier vers le serveur… ('+Math.round(p*100)+' %)');});
+    const url=await uploadFirmware(buf,f.name,(p)=>{
+      otaProgress(p*0.15);   // l'envoi vers le site n'est qu'un préambule
+      otaSetStatus('Envoi de '+f.name+' vers le serveur… ('+Math.round(p*100)+' %)');
+    });
+    if(!ota)return;          // suivi abandonné pendant l'envoi
+    ota.url=url;
     log('OTA : fichier hébergé → '+url);
-    otaSetStatus('Fichier hébergé — demande de téléversement envoyée à l\'ESP32…');
+    otaStep(1,'commande publiée sur '+base+'/cmd — en attente de l\'accusé de réception de l\'ESP32');
+    otaSetStatus('Fichier hébergé — commande envoyée à l\'ESP32, en attente de sa réponse…');
     pub('cmd',JSON.stringify({action:'ota',url}),1);
   }catch(e){
-    otaFail('Échec de l\'envoi du fichier : '+e.message);
+    otaFail('Échec de l\'envoi du fichier vers le site : '+e.message,
+      'Le binaire n\'a même pas quitté ce navigateur : l\'ESP32 n\'a rien reçu et '
+      + '<b>tourne toujours sur son firmware actuel</b>. Vérifie ta connexion et le jeton d\'accès, puis relance.');
   }
 }
+
+/* Messages publiés par le firmware sur <base>/ota. */
 function onOtaStatus(raw){
   let s;try{s=JSON.parse(raw);}catch(e){return;}
-  if(s.state==='start'){ otaSetStatus('Téléchargement en cours sur l\'ESP32… (redémarrage automatique si tout se passe bien)'); }
-  else if(s.state==='ok'){
-    otaProgress(1);
-    otaSetStatus('✔ Téléchargement terminé — l\'ESP32 flashe et redémarre.','#1D9E75');
-    log('OTA réussi.'); otaBusy=false; $('btn-ota').disabled=false;
+
+  if(s.fw&&s.state==='booted'){
+    setFwRunning(s.fw);
+    log('Firmware démarré : '+s.fw+(s.boot?' (boot #'+s.boot+')':''));
+    if(ota&&ota.step>=2) otaSucceed(s.fw);
+    return;
   }
-  else if(s.state==='no_update'){
-    otaSetStatus('L\'ESP32 indique que ce firmware est déjà installé.','var(--wn)');
-    log('OTA : aucune mise à jour nécessaire.'); otaBusy=false; $('btn-ota').disabled=false;
+  if(!ota) return;
+
+  if(s.state==='start'){
+    ota.sawStart=true;
+    if(s.fw) setFwRunning(s.fw);
+    otaStep(2,'l\'ESP32 a accusé réception et télécharge le binaire');
+    let extra='';
+    if(s.freeSpace!==undefined){
+      extra=' · partition libre '+fmtBytes(s.freeSpace);
+      if(s.freeSpace<ota.size){
+        otaFail('Le binaire ne rentre pas dans la partition OTA de l\'ESP32.',
+          'Le firmware envoyé fait <b>'+fmtBytes(ota.size)+'</b> alors que la partition libre '
+          + 'ne fait que <b>'+fmtBytes(s.freeSpace)+'</b>. Recompile avec un schéma de partitions '
+          + 'offrant deux emplacements d\'application plus grands (menu Outils → Partition Scheme). '
+          + 'L\'ancien firmware reste actif.');
+        return;
+      }
+    }
+    otaSetStatus('L\'ESP32 télécharge le binaire ('+fmtBytes(ota.size)+')'+extra+'…');
+    return;
   }
-  else if(s.state==='error'){ otaFail('Erreur ESP32'+(s.code!==undefined?' (code '+s.code+')':'')+'.'); }
+  if(s.state==='progress'){
+    ota.sawStart=true;
+    ota.lastPct=s.pct;
+    ota.stepStartedAt=Date.now();     // ça avance : on réarme la surveillance
+    ota.stalled=false;
+    otaProgress(0.15+0.70*(s.pct/100));
+    otaSetStatus('Écriture en flash sur l\'ESP32 : '+s.pct+' %'
+      +(s.total?' ('+fmtBytes(s.received)+' / '+fmtBytes(s.total)+')':''));
+    otaStep(2,'reçu '+s.pct+' % du binaire');
+    return;
+  }
+  if(s.state==='ok'){
+    otaProgress(0.9);
+    otaStep(3,'binaire écrit et validé — l\'ESP32 redémarre sur la nouvelle partition');
+    otaSetStatus('✔ Binaire écrit — l\'ESP32 redémarre, en attente de son retour en ligne…','var(--ok)');
+    log('OTA : écriture terminée, redémarrage de l\'ESP32.');
+    return;
+  }
+  if(s.state==='no_update'){
+    otaEnd();
+    otaSetStatus('L\'ESP32 indique que ce firmware est déjà installé — rien n\'a été écrit.','var(--wn)');
+    otaDiag('L\'ESP32 a répondu <b>no_update</b> : il a jugé que le binaire proposé était identique '
+      + 'à celui déjà en place. <b>L\'ancien firmware continue de tourner.</b>');
+    log('OTA : aucune mise à jour nécessaire.');
+    return;
+  }
+  if(s.state==='error'){
+    otaFail('L\'ESP32 a rejeté la mise à jour'+(s.code!==undefined?' (code '+s.code+')':'')
+            +(s.msg?' : '+s.msg:'')+'.',
+      'L\'écriture a échoué côté carte, donc <b>l\'ancien firmware reste actif et continue de piloter la serre</b>. '
+      + 'Causes fréquentes : binaire trop gros pour la partition OTA, schéma de partitions sans double emplacement '
+      + '(« No OTA » ou « Huge APP »), ou coupure réseau pendant le téléchargement. Tu peux relancer sans risque.');
+  }
 }
-function otaFail(msg){
-  otaSetStatus('✘ '+msg+' — l\'ancien firmware reste actif. Tu peux relancer le téléversement.','#E24B4A');
+
+/* Un redémarrage observé sans avoir reçu {"state":"ok"} : c'est le cas des
+   firmwares qui redémarrent avant d'avoir pu publier leur succès. */
+function otaRebootObserved(how){
+  if(!ota||ota.done||ota.step<2) return;
+  otaSucceed(fwRunning,how);
+}
+function otaSucceed(fw,how){
+  if(!ota||ota.done) return;
+  ota.done=true;
+  otaStep(4);
+  ota.step=5;                          // toutes les étapes validées
+  otaRender();
+  otaProgress(1);
+  const dur=fmtDur(Date.now()-ota.startedAt);
+  otaSetStatus('✔ OTA terminé en '+dur+' — la carte tourne maintenant sur « '+(fw||'firmware inconnu')+' ».','var(--ok)');
+  const changed=fw&&ota.fwBefore&&fw!==ota.fwBefore;
+  otaDiag('<b>Mise à jour installée.</b> Fichier envoyé : <b>'+ota.name+'</b> ('+fmtBytes(ota.size)+').'
+    + '<br>Firmware avant : '+(ota.fwBefore||'inconnu')+' → maintenant : <b>'+(fw||'inconnu')+'</b>'
+    + (how?'<br>Confirmé par : '+how+'.':'')
+    + (changed?'':'<br>⚠ Le nom du firmware n\'a pas changé — vérifie que c\'est bien le binaire que tu voulais installer.'));
+  log('OTA réussi en '+dur+' — firmware actif : '+(fw||'inconnu'));
+  otaEnd();
+}
+
+/* Surveillance : sans elle, un firmware muet laisse la page figée sur le
+   dernier message reçu, ce qui ressemble à un plantage alors que la carte
+   peut très bien avoir redémarré normalement. */
+function otaTick(){
+  if(!ota||ota.done) return;
+  const now=Date.now(), el=now-ota.stepStartedAt, lim=OTA_TIMEOUTS[ota.step];
+  if(ota.step>=1&&!ota.stalled&&lim&&el>lim){
+    ota.stalled=true; otaRender();
+    otaStalled();
+  }
+}
+function otaStalled(){
+  const waited=fmtDur(Date.now()-ota.stepStartedAt);
+  if(ota.step===1){
+    otaSetStatus('⚠ Aucune réponse de l\'ESP32 depuis '+waited+'.','var(--wn)');
+    otaDiag('<b>Le fichier est bien hébergé, mais l\'ESP32 n\'a pas accusé réception de la commande.</b>'
+      + '<ul><li>Vérifie la pastille « ESP32 » en haut de la page : si elle est hors ligne, la carte '
+      + 'n\'est pas connectée au broker et n\'a jamais vu la commande.</li>'
+      + '<li>Vérifie que le topic de base (<b>'+base+'</b>) correspond bien à celui du firmware.</li>'
+      + '<li>Rien n\'a été écrit sur la carte : l\'ancien firmware tourne toujours.</li></ul>');
+  } else if(ota.step===2){
+    otaSetStatus('⚠ Plus de nouvelles du téléchargement depuis '+waited+'.','var(--wn)');
+    otaDiag('<b>L\'ESP32 a commencé le téléchargement mais ne dit plus rien.</b> Deux explications :'
+      + '<ul><li><b>Le plus probable : tout s\'est bien passé.</b> Les firmwares qui redémarrent '
+      + 'automatiquement en fin d\'écriture n\'ont pas le temps de publier leur succès — le site reste '
+      + 'alors sur ce dernier message. Regarde l\'écran de la carte et la pastille « ESP32 » : si elle '
+      + 'repasse en ligne, la mise à jour est installée.</li>'
+      + '<li>Sinon, coupure réseau pendant le téléchargement — dans ce cas l\'ancien firmware reste actif '
+      + 'et tu peux relancer.</li></ul>'
+      + (ota.sawOffline?'<br>Le broker a signalé l\'ESP32 <b>hors ligne</b> : cohérent avec un redémarrage en cours.':''));
+  } else if(ota.step===3||ota.step===4){
+    otaSetStatus('⚠ L\'ESP32 a redémarré mais n\'est pas revenu depuis '+waited+'.','var(--wn)');
+    otaDiag('<b>Le binaire a été écrit, mais le nouveau firmware ne s\'est pas réannoncé.</b>'
+      + '<ul><li>Si le nouveau firmware ne se connecte pas au même broker ou au même topic, c\'est normal — '
+      + 'regarde l\'écran de la carte pour confirmer.</li>'
+      + '<li>S\'il plante au démarrage, l\'ESP32 revient automatiquement sur l\'ancienne partition après '
+      + 'quelques redémarrages ratés ; sinon, un flash par câble USB reste toujours possible.</li></ul>');
+  }
+}
+
+function otaFail(msg,diagHtml){
+  if(ota) ota.failedAt=ota.step;
+  otaRender();
+  otaSetStatus('✘ '+msg+' Tu peux relancer le téléversement.','var(--cr)');
+  otaDiag(diagHtml||null);
   log('OTA : '+msg);
-  otaBusy=false; $('btn-ota').disabled=false;
+  otaEnd();
+}
+function otaAbandon(){
+  otaSetStatus('Suivi interrompu. L\'ESP32 poursuit son OTA de son côté — le résultat '
+    + 'apparaîtra dans le journal quand il se réannoncera.','var(--wn)');
+  otaEnd();
+}
+function otaEnd(){
+  if(ota&&ota.timer) clearInterval(ota.timer);
+  ota=null;
+  $('btn-ota').disabled=false;
+  $('btn-ota-stop').hidden=true;
 }
 
 /* ════════ INIT ════════ */
+setFwRunning(null);
 try{
   const saved=JSON.parse(localStorage.getItem('vgh')||'{}');
   if(saved.host)$('c-host').value=saved.host;
