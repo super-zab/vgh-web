@@ -752,6 +752,8 @@ function fmtDur(ms){const s=Math.round(ms/1000);return s<60?s+' s':Math.floor(s/
 // Un message retenu renseigne le bandeau (mieux que « inconnu ») mais ne
 // vaut jamais comme preuve qu'un firmware vient de démarrer.
 let fwFreshAt=0;
+let fwSha=null;            // empreinte de build du firmware embarque
+let ota_lastSentSha=null;  // empreinte du dernier binaire televerse
 
 function setFwRunning(name,retained){
   if(name){ fwRunning=name; fwSeenAt=Date.now(); if(!retained) fwFreshAt=fwSeenAt; }
@@ -807,6 +809,28 @@ function otaStep(i,note){
   otaRender();
 }
 
+/* ── Empreinte de build ───────────────────────────────────────────────
+   Toute image ESP32 contient une structure esp_app_desc_t placée juste
+   après l'en-tête d'image (24 o) et l'en-tête du premier segment (8 o),
+   donc à l'offset 0x20. Son champ app_elf_sha256 (offset 0xB0) change à
+   CHAQUE compilation.
+
+   C'est la seule identité fiable d'un binaire : un nom de firmware ou un
+   numéro de version dépendent de la mémoire du développeur, pas celle-ci.
+   Le firmware relit exactement le même champ à l'exécution
+   (esp_ota_get_app_description), donc le site peut prouver que la carte
+   exécute bien l'image envoyée — et surtout détecter le cas classique du
+   vieux .bin repris par erreur dans le sélecteur de fichiers. */
+function parseAppDesc(buf){
+  if(buf.length < 0xD0) return null;
+  const dv=new DataView(buf.buffer, buf.byteOffset, buf.length);
+  if(dv.getUint32(0x20, true) !== 0xABCD5432) return null;   // magic esp_app_desc
+  const str=(o,n)=>{let s='';for(let i=0;i<n;i++){const c=buf[o+i];if(!c)break;s+=String.fromCharCode(c);}return s;};
+  let sha='';
+  for(let i=0;i<8;i++) sha += buf[0xB0+i].toString(16).padStart(2,'0');
+  return { sha, idf: str(0x90,32) };
+}
+
 function uploadFirmware(buf,name,onProgress){
   return new Promise((resolve,reject)=>{
     const token=localStorage.getItem('vgh-api-token')||'';
@@ -844,17 +868,38 @@ async function otaStart(){
         + ' au lieu de 0xE9.\n\nReprends le .bin exporté par Arduino IDE.');
     return;
   }
-  // Dernier garde-fou avant d'écraser la flash : le nom du fichier envoyé est
-  // la seule chose qui distingue un firmware de test du firmware de la serre,
-  // et l'erreur ne se voit qu'une fois la carte redémarrée. On le fait relire.
-  if(!confirm('Firmware à installer :\n\n    '+f.name+'   ('+fmtBytes(buf.length)+')\n\n'
-            + 'Cible : '+base+'\n'
-            + 'Firmware actuellement embarqué : '+(fwRunning||'inconnu')+'\n\n'
+  // Dernier garde-fou avant d'écraser la flash. Le nom du fichier ne prouve
+  // rien — un vieux build porte le même nom qu'un build frais. On affiche
+  // donc la DATE du fichier et son empreinte de compilation, les deux seules
+  // choses qui distinguent réellement deux binaires.
+  const desc=parseAppDesc(buf);
+  const age=Math.floor((Date.now()-f.lastModified)/60000);
+  const dated=new Date(f.lastModified).toLocaleString();
+  let warn='';
+  if(age>120) warn+='\n⚠ Ce fichier date de '+dated+' — plus de '
+                  + (age>2880 ? Math.floor(age/1440)+' jours' : Math.floor(age/60)+' heures')
+                  + '. Est-ce bien la compilation que tu viens de faire ?\n';
+  if(desc && fwSha && desc.sha===fwSha)
+    warn+='\n⚠ Ce binaire est DÉJÀ celui qui tourne sur la carte (empreinte identique).\n';
+  if(desc && ota_lastSentSha && desc.sha===ota_lastSentSha)
+    warn+='\n⚠ C\'est exactement le même fichier que celui envoyé au coup précédent.\n';
+  if(!desc) warn+='\n⚠ Empreinte de compilation illisible — la vérification automatique après redémarrage sera impossible.\n';
+
+  if(!confirm('Firmware à installer :\n\n'
+            + '    ' + f.name + '\n'
+            + '    ' + fmtBytes(buf.length) + '\n'
+            + '    compilé/modifié le ' + dated + '\n'
+            + '    empreinte ' + (desc ? desc.sha : 'illisible') + '\n\n'
+            + 'Cible : ' + base + '\n'
+            + 'Firmware embarqué : ' + (fwRunning||'inconnu') + (fwSha ? ' ('+fwSha+')' : '') + '\n'
+            + warn + '\n'
             + 'Ce binaire va remplacer le programme de la carte. Confirmer ?')) return;
 
   ota={step:0,failedAt:-1,stalled:false,stepNote:'',stepStartedAt:Date.now(),
        startedAt:Date.now(),name:f.name,size:buf.length,url:null,
+       sha:desc?desc.sha:null, shaBefore:fwSha,
        sawStart:false,sawOffline:false,fwBefore:fwRunning,done:false};
+  ota_lastSentSha=ota.sha;
   $('btn-ota').disabled=true;
   $('btn-ota-stop').hidden=false;
   otaDiag(null);
@@ -887,6 +932,7 @@ function onOtaStatus(raw,retained){
 
   if(s.fw&&s.state==='booted'){
     setFwRunning(s.fw,retained);
+    if(s.sha&&!retained) fwSha=s.sha;
     // Un « booted » retenu est celui d'un démarrage passé, redistribué par le
     // broker à chaque réabonnement — il renseigne le bandeau mais ne prouve
     // rien sur l'OTA en cours.
@@ -894,7 +940,7 @@ function onOtaStatus(raw,retained){
     log('Firmware démarré : '+s.fw+(s.boot?' (boot #'+s.boot+')':''));
     if(ota&&ota.step>=2){
       otaRebootObserved('annonce de démarrage du firmware');
-      otaConfirmFw(s.fw,'le firmware s\'est annoncé au démarrage');
+      otaConfirmFw(s.fw,'le firmware s\'est annoncé au démarrage',s.sha);
     }
     return;
   }
@@ -974,8 +1020,12 @@ function otaRebootObserved(how){
 
 /* Seule voie vers un verdict vert : un firmware qui s'annonce dans un
    message NON RETENU postérieur au lancement de l'OTA. */
-function otaConfirmFw(fw,how){
+function otaConfirmFw(fw,how,sha){
   if(!ota||ota.done||ota.step<2||!fw) return;
+  // L'empreinte prime sur le nom : c'est la preuve que la carte execute
+  // bien le binaire televerse, et pas un autre build du meme firmware.
+  if(ota.sha && sha && sha!==ota.sha){ otaShaMismatch(sha); return; }
+  if(ota.sha && sha && sha===ota.sha){ otaSucceedVerified(fw,sha); return; }
   if(fw===ota.fwBefore){ otaWrongFw(fw,how); return; }
   ota.done=true;
   ota.step=5; otaRender(); otaProgress(1);
@@ -985,6 +1035,41 @@ function otaConfirmFw(fw,how){
     + '<br>Firmware avant : '+(ota.fwBefore||'inconnu')+' → maintenant : <b>'+fw+'</b>'
     + '<br>Confirmé par : '+how+'.');
   log('OTA réussi en '+dur+' — firmware actif : '+fw);
+  otaEnd();
+}
+
+/* Vérification forte : l'empreinte annoncée par la carte est celle du
+   binaire téléversé. Il n'y a plus rien à interpréter. */
+function otaSucceedVerified(fw,sha){
+  if(!ota||ota.done) return;
+  ota.done=true;
+  ota.step=5; otaRender(); otaProgress(1);
+  const dur=fmtDur(Date.now()-ota.startedAt);
+  otaSetStatus('✔ OTA vérifié en '+dur+' — la carte exécute bien le binaire envoyé ('+fw+').','var(--ok)');
+  otaDiag('<b>Mise à jour installée et vérifiée par empreinte de compilation.</b>'
+    + '<br>Fichier envoyé : <b>'+ota.name+'</b> ('+fmtBytes(ota.size)+')'
+    + '<br>Empreinte envoyée : <code>'+ota.sha+'</code>'
+    + '<br>Empreinte rapportée par la carte : <code>'+sha+'</code> — identiques.'
+    + '<br>Firmware : '+(ota.fwBefore||'inconnu')+' → <b>'+fw+'</b>');
+  log('OTA vérifié en '+dur+' — empreinte '+sha+' confirmée par la carte.');
+  otaEnd();
+}
+
+/* L'empreinte ne correspond pas : la carte tourne sur une AUTRE image que
+   celle qu'on vient d'envoyer. Presque toujours un vieux .bin repris par
+   erreur, ou un retour sur l'ancienne partition. */
+function otaShaMismatch(sha){
+  if(!ota||ota.done) return;
+  ota.done=true; ota.failedAt=4; otaRender();
+  otaSetStatus('✘ La carte n\'exécute pas le binaire envoyé — empreintes différentes.','var(--cr)');
+  otaDiag('<b>Le binaire qui tourne n\'est pas celui qui a été téléversé.</b>'
+    + '<br>Empreinte envoyée&nbsp;: <code>'+ota.sha+'</code>'
+    + '<br>Empreinte de la carte&nbsp;: <code>'+sha+'</code>'
+    + '<ul><li><b>Cause la plus fréquente : le fichier choisi n\'est pas la compilation que tu viens de faire.</b> '
+    + 'Le sélecteur de fichiers du navigateur s\'ouvre dans Téléchargements et garde les chemins récents — '
+    + 'vérifie la date affichée à la confirmation, elle doit correspondre à ta compilation.</li>'
+    + '<li>Sinon, l\'image écrite n\'a pas démarré et l\'ESP32 est revenu sur l\'ancienne partition.</li></ul>');
+  log('OTA : empreinte non conforme (envoyé '+ota.sha+', carte '+sha+').');
   otaEnd();
 }
 
