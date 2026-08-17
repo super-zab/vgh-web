@@ -591,6 +591,19 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <text class="cnot" x="976" y="361" id="sv-fannote">2× EC · tout ou rien</text>
   <g class="cbadge"><rect x="1106" y="315" width="30" height="17" rx="8"/><text x="1121" y="327">×2</text></g>
 </g>
+<!-- Delta intérieur − extérieur : ce n'est pas une mesure mais LA grandeur qui
+     décide de la ventilation en AUTO jour (bandes deltaLowC / deltaHighC).
+     Elle méritait sa place sur la vue d'ensemble, à côté des sorties qu'elle
+     commande, et pas seulement en légende de la carte Température. -->
+<g class="co" id="co-delta">
+  <polyline class="lead" points="962,528 932,528 824,112"/>
+  <circle class="hal" cx="824" cy="112" r="5"/>
+  <circle class="anc" cx="824" cy="112" r="4"/>
+  <rect class="cbox" x="962" y="496" width="186" height="64" rx="10"/>
+  <text class="ctit" x="976" y="515">DELTA INT − EXT</text>
+  <text class="cval" x="976" y="540"><tspan id="sv-delta">--</tspan><tspan class="cuni"> °C</tspan></text>
+  <text class="cnot" x="976" y="553" id="sv-deltanote">--</text>
+</g>
 <g class="co" id="co-valve">
   <polyline class="lead" points="962,432 932,432 713,281"/>
   <circle class="hal" cx="713" cy="281" r="5"/>
@@ -634,6 +647,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
   <div id="scene-fallback" class="grid">
     <div class="card"><div class="lbl">Lumière</div><div><span class="val" id="m-lux">--</span><span class="unit">lx</span></div></div>
     <div class="card"><div class="lbl">Temp air</div><div><span class="val" id="m-temp">--</span><span class="unit">°C</span></div></div>
+    <div class="card"><div class="lbl">Delta int − ext</div><div><span class="val" id="m-delta">--</span><span class="unit">°C</span></div></div>
     <div class="card"><div class="lbl">Humidité</div><div><span class="val" id="m-rh">--</span><span class="unit">%</span></div></div>
     <div class="card"><div class="lbl">Canopée</div><div><span class="val" id="m-amg">--</span><span class="unit">°C</span></div></div>
     <div class="card"><div class="lbl">Indice UV</div><div><span class="val" id="m-uv">--</span></div></div>
@@ -720,7 +734,11 @@ const META = {
   "key": "tempIn",
   "arr": "temp_all",
   "dec": 1,
-  "view": [460, 0, 540, 480],
+  /* Décalé vers la gauche (x 460 → 400) : le libellé du boîtier électronique
+     est aligné à droite sur x=492 et commence vers x=426 — il débordait du
+     cadre précédent. La largeur couvre toujours « Extérieur · bas », qui
+     s'étend jusqu'à ~x=935. */
+  "view": [400, 0, 545, 470],
   "locs": [
    "Intérieur · haut",
    "Intérieur · bas",
@@ -741,7 +759,7 @@ const META = {
   "key": "rhIn",
   "arr": "rh_all",
   "dec": 0,
-  "view": [460, 0, 540, 480],
+  "view": [400, 0, 545, 470],   // même cadrage que « temp » : voir la note ci-dessus
   "locs": [
    "Intérieur · haut",
    "Intérieur · bas",
@@ -897,6 +915,15 @@ function updateScene(d){
   setTxt('sv-leafnote','DS18B20 · témoin '+fnum(d.witnessC,1)+' °C');
   setTxt('sv-leafbadge','×'+probes.length);
 
+  /* Le firmware publie déjà la bande retenue dans fanReason (dT BAS / MOY /
+     HAUT) : on l'affiche telle quelle plutôt que de redeviner ses seuils,
+     que cette page ne reçoit pas. */
+  const dt=d.deltaT;
+  setTxt('sv-delta', dt==null?'--':(dt>0?'+':'')+fnum(dt,1),
+         dt==null?'#8b929b':dt>=2?'#e05252':dt>=0?'#e79a2b':'#25a97e');
+  setTxt('sv-deltanote','int '+fnum(d.tempIn,1)+' − ext '+fnum(d.tempOut,1)+' °C'
+        +(d.fanReason&&/^dT/.test(d.fanReason)?' · bande '+d.fanReason:''));
+
   setTxt('sv-fan', d.fan?'MARCHE':'ARRÊT', d.fan?'#25a97e':'#8b929b');
   setTxt('sv-fannote','2× EC · '+(d.fanReason||'--'));
   const vo=!!d.mist;
@@ -917,6 +944,7 @@ function updateScene(d){
 
   /* repli mobile */
   setTxt('m-lux',d.luxIn==null?'--':Math.round(d.luxIn));setTxt('m-temp',fnum(d.tempIn,1));
+  setTxt('m-delta',dt==null?'--':(dt>0?'+':'')+fnum(dt,1));
   setTxt('m-rh',fnum(d.rhIn,0));setTxt('m-amg',fnum(d.leafAmgMaxC,1));
   setTxt('m-uv',fnum(d.uvIn,2));setTxt('m-co2',d.co2In==null?'--':Math.round(d.co2In));
   setTxt('m-leaf',d.leafAirDeltaC==null?'--':(d.leafAirDeltaC>0?'+':'')+fnum(d.leafAirDeltaC,2));
