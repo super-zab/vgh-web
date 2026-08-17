@@ -80,6 +80,44 @@ details .inner{padding:2px 14px 16px;}
 .sp-item input{width:100%;}
 .sp-item .u{font-size:10px;color:var(--mt2);margin-left:4px;}
 
+/* ── Sous-sections de la configuration ──
+   Les réglages propres à un mode et les réglages qui s'appliquent quel que
+   soit le mode ne se relisent pas de la même façon : on les sépare pour
+   qu'on sache d'un coup d'œil ce qu'on est en train de changer. */
+.subsec{font-size:11.5px;font-weight:600;color:var(--tx);margin:4px 0 9px;
+ display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+.subsec:not(:first-child){margin-top:20px;}
+.subsec .sn{font-weight:400;font-size:11px;color:var(--mt2);}
+
+/* Le groupe correspondant au mode réellement actif sur la serre est surligné :
+   c'est le seul moyen de savoir, en regardant la config, quels champs sont
+   en train de piloter la serre à cet instant. */
+details.live{border-color:var(--ok);background:#0f1613;}
+details.live summary{color:var(--ok);}
+details.live summary::before{border-color:var(--ok);}
+.livetag{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.06em;
+ text-transform:uppercase;color:var(--ok);background:#0c2b20;border-radius:999px;padding:3px 9px;}
+
+/* ── Matrice de décision du mode AUTO (jour) ──
+   Reprise directe de runControl() dans Greenhouse_V7.ino : les bandes de
+   delta-T fixent le ventilateur, les bandes de VPD la brumisation. */
+.mtx-head{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:var(--mt);}
+.mtx-scroll{overflow-x:auto;}
+table.mtx{border-collapse:separate;border-spacing:6px;font-size:12px;min-width:520px;}
+table.mtx th{font-weight:600;color:var(--mt);font-size:11px;text-align:center;padding:4px 8px;line-height:1.4;}
+table.mtx th.rh{text-align:right;white-space:nowrap;}
+table.mtx th small,table.mtx td small{display:block;font-size:10px;color:var(--mt2);font-weight:400;margin-top:2px;}
+table.mtx td{background:#0f1113;border:1px solid var(--bd);border-radius:9px;padding:9px 10px;text-align:center;
+ transition:background .2s,border-color .2s;}
+table.mtx td.hit{background:#0c2b20;border-color:var(--ok);box-shadow:0 0 0 1px rgba(37,169,126,.35);}
+.io{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.03em;
+ border-radius:999px;padding:3px 9px;margin:0 2px;background:#20242800;border:1px solid var(--bd2);color:var(--mt2);}
+.io.on{border-color:transparent;background:#0c2b20;color:var(--ok);}
+.io.cond{border-color:#3a3010;background:#1a1608;color:var(--wn);}
+.mtx-note{font-size:11px;color:var(--mt2);margin-top:12px;line-height:1.55;}
+.mtx-off{opacity:.4;}
+.modebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+
 .bwrap{height:10px;background:#0f1113;border:1px solid var(--bd);border-radius:999px;overflow:hidden;margin:12px 0 8px;}
 .bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ok),var(--ac));width:0;transition:width .2s;}
 
@@ -204,10 +242,39 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
   <div class="hint">⚠ En MANUEL, les durées de cycle viennent de <code>manPeriodS</code>/<code>manFanOnS</code>/<code>manMistOnS</code> dans la configuration ci-dessous — plus de réglage instantané fan/vanne, tout passe par des cycles temporisés.</div>
 </section>
 
+<!-- ═══ MODE DE FONCTIONNEMENT ═══ -->
+<section>
+  <div class="sec-title">Mode de fonctionnement <span class="fill"></span>
+    <span class="aside" id="mode-aside">en attente de données…</span></div>
+  <div class="modebar">
+    <span class="chip">Mode actif <span id="mode-badge" class="badge b-standby">--</span></span>
+    <span class="chip">Cycle&nbsp;<strong id="mode-day">--</strong></span>
+    <span class="chip">Ventilateurs&nbsp;<strong id="mode-fan">--</strong></span>
+    <span class="chip">Brumisation&nbsp;<strong id="mode-mist">--</strong></span>
+  </div>
+  <div id="matrix-block">
+    <div class="mtx-head">
+      <span>Matrice de décision du mode <b style="color:var(--tx)">AUTO — jour</b></span>
+      <span class="divider"></span>
+      <span id="mtx-live">—</span>
+    </div>
+    <div class="mtx-scroll"><table class="mtx" id="mtx"></table></div>
+    <div class="mtx-note" id="mtx-note"></div>
+  </div>
+</section>
+
 <!-- ═══ CONFIGURATION ═══ -->
 <section>
   <div class="sec-title">Configuration <span class="fill"></span><span class="aside" id="sp-status">en attente de données…</span></div>
-  <div id="sp-groups"></div>
+
+  <div class="subsec">Paramètres des modes
+    <span class="sn">durées de cycle propres à chaque mode — seul le groupe surligné pilote la serre en ce moment</span></div>
+  <div id="sp-modes"></div>
+
+  <div class="subsec">Paramètres globaux
+    <span class="sn">s'appliquent quel que soit le mode</span></div>
+  <div id="sp-globals"></div>
+
   <div class="row" style="margin-top:12px">
     <button class="btn-ok" id="btn-sp-send" onclick="sendSetpoints()" disabled>Envoyer les modifications (<span id="sp-count">0</span>)</button>
     <button onclick="cmd({action:'getConfig'})">Recharger depuis l'ESP32</button>
@@ -291,20 +358,31 @@ function applyLock(open){
   }catch(e){/* hors-ligne : reste verrouillé, l'utilisateur peut réessayer */}
 })();
 
-/* ── schéma de configuration — CFG_FIELDS de Greenhouse_V5.ino (33 champs) ── */
-const SP_SCHEMA=[
- {g:'Cycle jour',f:[
+/* ── Schéma de configuration — CFG_FIELDS de Greenhouse_V7.ino ──
+   Deux familles, volontairement séparées à l'écran :
+     SP_MODES  : durées de cycle propres à un mode. Un seul de ces groupes
+                 pilote la serre à un instant donné — d'où la clé « mode »,
+                 qui permet de surligner celui qui est réellement actif.
+     SP_GLOBAL : réglages qui s'appliquent quel que soit le mode.
+   Les bornes reproduisent celles de CFG_FIELDS : le firmware rejette
+   silencieusement toute valeur hors bornes, autant l'empêcher ici. */
+const SP_MODES=[
+ {key:'day', g:'AUTO — cycle jour', f:[
   ['deltaLowC','Delta bas (int − ext)','°C',0.5,-20,20],['deltaHighC','Delta haut (int − ext)','°C',0.5,-20,20],
   ['dayPeriodS','Période jour','s',30,30,7200],
   ['dayOnMidS','Ventilo ON — delta moyen','s',10,0,7200],['dayOnHighS','Ventilo ON — delta haut','s',10,0,7200]]},
- {g:'Cycle nuit',f:[
+ {key:'night', g:'Cycle nuit — AUTO et fallback', f:[
   ['nightPeriodS','Période nuit','s',30,30,7200],['nightOnS','Ventilo ON nuit','s',10,0,7200],
   ['nightMist','Brumisation nuit (0/1)',' ',1,0,1]]},
- {g:'Mode dégradé (fallback)',f:[
-  ['fbDayPeriodS','Période fallback','s',30,30,7200],['fbDayOnS','Ventilo ON fallback','s',10,0,7200]]},
- {g:'Mode manuel',f:[
+ {key:'fb', g:'FALLBACK — cycle jour', f:[
+  ['fbDayPeriodS','Période fallback','s',30,30,7200],['fbDayOnS','Ventilo ON fallback','s',10,0,7200],
+  ['fbMist','Brumisation fallback (0/1)',' ',1,0,1],
+  ['fbDayMistOnS','Brumisation ON fallback','s',10,0,7200]]},
+ {key:'man', g:'MANUEL', f:[
   ['manPeriodS','Période manuel','s',30,30,7200],['manFanOnS','Ventilo ON manuel','s',10,0,7200],
-  ['manMistOnS','Brumisation ON manuel','s',10,0,7200]]},
+  ['manMistOnS','Brumisation ON manuel','s',10,0,7200]]}
+];
+const SP_GLOBAL=[
  {g:'Brumisation — VPD',f:[
   ['mistUseVpd','Pilotée par VPD (0/1)',' ',1,0,1],
   ['vpdMistHigh','VPD seuil haut','kPa',0.1,0.1,6],['vpdMistMid','VPD seuil moyen','kPa',0.1,0.1,6],
@@ -314,21 +392,29 @@ const SP_SCHEMA=[
   ['dayStartHour','Début jour (secours horaire)','h',1,0,23],['dayEndHour','Fin jour (secours horaire)','h',1,0,23]]},
  {g:'Sécurités',f:[
   ['staleS','Délai avant FALLBACK','s',30,30,86400],['valveMaxOnS','Ouverture continue max vanne','s',10,1,3600]]},
+ {g:'Ventilation du coffret électronique',f:[
+  ['boxTempOnC','Démarrage ventilos coffret','°C',0.5,20,80],['boxTempOffC','Arrêt (hystérésis)','°C',0.5,15,80],
+  ['boxTempCritC','Démarrage inconditionnel','°C',0.5,30,90],
+  ['boxDeltaMinC','Écart mini coffret/serre','°C',0.5,0,20],
+  ['boxRhOnC','Humidité déclenchant une purge','%',1,0,100],['boxDewMarginC','Marge au point de rosée','°C',0.5,0,20],
+  ['boxAirPeriodS','Aération de principe — période','s',60,60,86400],['boxAirOnS','Aération de principe — durée','s',10,0,3600]]},
  {g:'Énergie — calibration',f:[
   ['busV','Tension du bus','V',1,5,60],
   ['fan1RatedW','Ventilo 1 — puissance nominale','W',1,0,1000],['fan1RatedRpm','Ventilo 1 — régime nominal','tr/min',50,100,10000],
   ['fan2RatedW','Ventilo 2 — puissance nominale','W',1,0,1000],['fan2RatedRpm','Ventilo 2 — régime nominal','tr/min',50,100,10000],
-  ['fanIdleW','Électronique ventilo au repos','W',0.5,0,50],
-  ['valveW','Bobine électrovanne','W',0.5,0,100],['baseW','ESP32 + écran + capteurs','W',0.5,0,100]]},
- {g:'Télémétrie',f:[
-  ['publishPeriodS','Période de publication','s',10,10,3600]]}
+  ['valveW','Bobine électrovanne','W',0.5,0,100],['boxFanW','Ventilos de coffret (les 2)','W',0.5,0,100],
+  ['baseW','ESP32 + écran + capteurs','W',0.5,0,100]]},
+ {g:'Télémétrie & écran',f:[
+  ['publishPeriodS','Période de publication','s',10,10,3600],
+  ['displayReinitS','Ré-init écran (0 = jamais)','s',60,0,86400]]}
 ];
+const SP_SCHEMA=[...SP_MODES,...SP_GLOBAL];   // vue à plat : diff, bornes, remplissage
 
-function buildSpUI(){
-  const box=$('sp-groups');if(!box||box.dataset.built)return;box.dataset.built='1';
-  SP_SCHEMA.forEach((grp,gi)=>{
-    const d=document.createElement('details');if(gi===0)d.open=true;
-    d.innerHTML='<summary>'+grp.g+'</summary>';
+function buildGroups(box,groups,openFirst){
+  groups.forEach((grp,gi)=>{
+    const d=document.createElement('details');if(openFirst&&gi===0)d.open=true;
+    if(grp.key)d.dataset.mode=grp.key;
+    d.innerHTML='<summary>'+grp.g+'<span class="livetag" hidden>actif</span></summary>';
     const inner=document.createElement('div');inner.className='inner';
     const g=document.createElement('div');g.className='sp-grid';
     grp.f.forEach(([k,label,unit,step,mn,mx])=>{
@@ -339,7 +425,15 @@ function buildSpUI(){
     });
     inner.appendChild(g);d.appendChild(inner);box.appendChild(d);
   });
-  box.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',updateSpDiff));
+}
+function buildSpUI(){
+  const modes=$('sp-modes'), globals=$('sp-globals');
+  if(!modes||modes.dataset.built)return;modes.dataset.built='1';
+  buildGroups(modes,SP_MODES,true);
+  buildGroups(globals,SP_GLOBAL,false);
+  document.querySelectorAll('#sp-modes input,#sp-globals input')
+    .forEach(inp=>inp.addEventListener('input',updateSpDiff));
+  buildMatrix();
 }
 function fillSpUI(){
   if(!currentSp)return;
@@ -376,6 +470,172 @@ function sendSetpoints(){
   log('Configuration envoyée : '+JSON.stringify(ch));
 }
 
+/* ════════ MODE ACTIF ET MATRICE DE DÉCISION ════════
+   Tout ce bloc ne fait que relire, côté site, ce que décide runControl()
+   dans Greenhouse_V7.ino — il ne recalcule aucune commande. En AUTO jour :
+
+     ventilateurs, par bande de delta-T (intérieur − extérieur)
+       ΔT < deltaLowC                  → arrêt
+       deltaLowC ≤ ΔT < deltaHighC     → dayOnMidS
+       ΔT ≥ deltaHighC                 → dayOnHighS
+       ΔT indisponible                 → dayOnMidS (bande moyenne par défaut)
+
+     brumisation, par bande de VPD
+       VPD ≥ vpdMistHigh               → autorisée quel que soit le delta
+       vpdMistMid ≤ VPD < vpdMistHigh  → autorisée SI mistDeltaMinC ≤ ΔT ≤ mistDeltaMaxC
+       VPD < vpdMistMid                → bloquée
+       VPD indisponible                → bloquée
+
+   Les deux fenêtres sont décalées d'une demi-période : « ON » veut dire
+   « autorisé dans sa fenêtre », jamais « ventilo et vanne ensemble ». */
+let lastLive=null;
+
+const MTX_ROWS=[
+ {k:'low', th:'Delta bas',   sub:'ΔT < <b>%low%</b>',              fan:false},
+ {k:'mid', th:'Delta moyen', sub:'<b>%low%</b> ≤ ΔT < <b>%high%</b>', fan:true, on:'dayOnMidS'},
+ {k:'high',th:'Delta haut',  sub:'ΔT ≥ <b>%high%</b>',             fan:true, on:'dayOnHighS'}
+];
+const MTX_COLS=[
+ {k:'low', th:'VPD bas',   sub:'VPD < <b>%mid%</b>',                    mist:'off'},
+ {k:'mid', th:'VPD moyen', sub:'<b>%mid%</b> ≤ VPD < <b>%high%</b>',    mist:'cond'},
+ {k:'high',th:'VPD haut',  sub:'VPD ≥ <b>%high%</b>',                   mist:'on'}
+];
+function spv(k,dec,unit){
+  if(!currentSp||currentSp[k]===undefined)return k;
+  return Number(currentSp[k]).toFixed(dec)+(unit||'');
+}
+function buildMatrix(){
+  const t=$('mtx');if(!t)return;
+  let h='<tr><th></th>'+MTX_COLS.map(c=>'<th>'+c.th+'<small class="csub" data-tpl="'+
+        c.sub.replace(/"/g,'&quot;')+'">—</small></th>').join('')+'</tr>';
+  MTX_ROWS.forEach(r=>{
+    h+='<tr><th class="rh">'+r.th+'<small class="rsub" data-tpl="'+
+       r.sub.replace(/"/g,'&quot;')+'">—</small></th>';
+    MTX_COLS.forEach(c=>{
+      const v='<span class="io'+(r.fan?' on':'')+'">V '+(r.fan?'ON':'OFF')+'</span>';
+      // Colonne « VPD moyen » : la brumisation dépend en plus de la fenêtre
+      // de delta [mistDeltaMinC ; mistDeltaMaxC], qui ne coïncide pas avec
+      // les bandes deltaLowC/deltaHighC — d'où la case conditionnelle.
+      const m=c.mist==='on' ?'<span class="io on">M ON</span>'
+            :c.mist==='off'?'<span class="io">M OFF</span>'
+                           :'<span class="io cond">M ON *</span>';
+      h+='<td id="mx-'+r.k+'-'+c.k+'">'+v+m+'</td>';
+    });
+    h+='</tr>';
+  });
+  t.innerHTML=h;
+  refreshMatrixLabels();
+}
+function refreshMatrixLabels(){
+  document.querySelectorAll('#mtx .rsub').forEach(e=>{
+    e.innerHTML=e.dataset.tpl.replace(/%low%/g,spv('deltaLowC',1,' °C'))
+                             .replace(/%high%/g,spv('deltaHighC',1,' °C'));
+  });
+  document.querySelectorAll('#mtx .csub').forEach(e=>{
+    e.innerHTML=e.dataset.tpl.replace(/%mid%/g,spv('vpdMistMid',2,' kPa'))
+                             .replace(/%high%/g,spv('vpdMistHigh',2,' kPa'));
+  });
+  if(lastLive)updateLive(lastLive);
+}
+
+/* Le groupe de réglages qui pilote réellement la serre à cet instant.
+   En FALLBACK de nuit, le firmware réutilise les paramètres de nuit :
+   c'est bien « Cycle nuit » qu'il faut surligner, pas le groupe fallback. */
+function activeGroupKey(mode,isDay){
+  if(mode==='MANUAL')return 'man';
+  if(mode==='STANDBY'||!mode)return null;
+  if(!isDay)return 'night';
+  return mode==='FALLBACK'?'fb':'day';
+}
+function highlightGroups(key){
+  document.querySelectorAll('details[data-mode]').forEach(d=>{
+    const on=(d.dataset.mode===key);
+    d.classList.toggle('live',on);
+    const tag=d.querySelector('.livetag');if(tag)tag.hidden=!on;
+    if(on)d.open=true;
+  });
+}
+function band(v,lo,hi){ return v<lo?'low':(v<hi?'mid':'high'); }
+
+function updateLive(d){
+  lastLive=d;
+  const mode=d.mode||'--', isDay=!!d.isDay;
+  const mb=$('mode-badge');mb.textContent=mode;
+  mb.className='badge b-'+(d.mode?d.mode.toLowerCase():'standby');
+  set('mode-day',isDay?'jour':'nuit');
+  set('mode-fan',(d.fan?'MARCHE':'arrêt')+' · '+(d.fanReason||'--'));
+  set('mode-mist',(d.mist?'MARCHE':'arrêt')+' · '+(d.mistReason||'--'));
+  set('mode-aside',(d.fanOnS!=null&&d.periodS)
+    ? 'cycle en cours '+d.fanOnS+' s ventilo / '+(d.mistOnS||0)+' s brumisation sur '+d.periodS+' s'
+    : 'cycle inconnu');
+
+  highlightGroups(activeGroupKey(mode,isDay));
+
+  /* ── Matrice ── */
+  document.querySelectorAll('#mtx td').forEach(td=>td.classList.remove('hit'));
+  const block=$('matrix-block'), note=$('mtx-note');
+  const autoDay=(mode==='AUTO'&&isDay);
+  block.classList.toggle('mtx-off',!autoDay);
+
+  if(!autoDay){
+    set('mtx-live','ne s\'applique pas en ce moment');
+    note.innerHTML=(mode==='AUTO'&&!isDay)
+      ? 'La serre est en <b>AUTO — nuit</b> : la matrice ci-dessus ne décrit que le cycle de jour. '
+        +'Le groupe <b>« Cycle nuit »</b> est surligné dans la configuration.'
+      : 'La serre est en <b>'+mode+'</b> : cette matrice ne décide rien en ce moment. '
+        +'Le groupe de réglages qui pilote la serre est surligné dans la configuration ci-dessous.';
+    return;
+  }
+
+  const cfgOk=!!currentSp;
+  const dt=(d.deltaT==null||isNaN(d.deltaT))?null:Number(d.deltaT);
+  const vpd=(d.vpd==null||isNaN(d.vpd))?null:Number(d.vpd);
+
+  // La ligne se lit dans fanReason quand la config n'est pas encore arrivée :
+  // le firmware a déjà tranché, inutile de deviner ses seuils.
+  let row=null;
+  if(cfgOk&&dt!=null) row=band(dt,Number(currentSp.deltaLowC),Number(currentSp.deltaHighC));
+  else if(d.fanReason) row=/BAS/.test(d.fanReason)?'low':/HAUT/.test(d.fanReason)?'high':
+                           /MOY/.test(d.fanReason)?'mid':null;
+  if(dt==null&&row===null) row='mid';        // dT? MOY : bande moyenne par défaut
+
+  let col=null;
+  if(cfgOk&&vpd!=null) col=band(vpd,Number(currentSp.vpdMistMid),Number(currentSp.vpdMistHigh));
+  else if(d.mistReason==='VPD HAUT') col='high';
+  else if(d.mistReason==='VPD+dT')   col='mid';
+  else if(d.mistReason==='VPD BAS')  col='low';
+
+  const useVpd=!currentSp||Number(currentSp.mistUseVpd)!==0;
+  const cell=(row&&col)?$('mx-'+row+'-'+col):null;
+  if(cell&&useVpd)cell.classList.add('hit');
+
+  set('mtx-live','ΔT '+(dt==null?'--':(dt>0?'+':'')+dt.toFixed(1)+' °C')
+    +' · VPD '+(vpd==null?'--':vpd.toFixed(2)+' kPa')
+    +' → V '+(d.fan?'MARCHE':'arrêt')+' / M '+(d.mist?'MARCHE':'arrêt'));
+
+  let n='';
+  if(!useVpd){
+    n='<b>mistUseVpd = 0</b> : la brumisation ne regarde pas le VPD, elle suit la durée du '
+     +'ventilateur. Les colonnes ci-dessus sont sans effet tant que ce réglage reste à 0.';
+  } else if(!row||!col){
+    const miss=[dt==null?'le delta int/ext':null,vpd==null?'le VPD':null].filter(Boolean);
+    n='Case indéterminée : '+(miss.length?miss.join(' et ')+' n\'est pas disponible':'donnée manquante')
+     +'. Le firmware retient alors la bande de delta moyenne pour les ventilateurs '
+     +'et bloque la brumisation.';
+  } else {
+    n='Scénario courant : <b>'+MTX_ROWS.find(r=>r.k===row).th.toLowerCase()+'</b> × <b>'
+     +MTX_COLS.find(c=>c.k===col).th.toLowerCase()+'</b>. '
+     +'Motifs publiés par le firmware : ventilateurs « '+(d.fanReason||'--')
+     +' », brumisation « '+(d.mistReason||'--')+' ».';
+  }
+  n+='<br>* Colonne VPD moyen : la brumisation n\'est autorisée que si le delta reste dans la '
+   +'fenêtre <b>'+spv('mistDeltaMinC',1,' °C')+'</b> → <b>'+spv('mistDeltaMaxC',1,' °C')+'</b>. '
+   +'Les fenêtres ventilateur et brumisation sont décalées d\'une demi-période : elles ne se recouvrent jamais.';
+  if(!cfgOk)n+='<br>⚠ Configuration pas encore reçue de l\'ESP32 — les seuils affichés sont symboliques. '
+   +'Clique sur « Recharger config ».';
+  note.innerHTML=n;
+}
+
 /* ════════ CONNEXION MQTT ════════ */
 let client=null, base='vgh/gh1', wantConn=false;
 let currentSp=null;
@@ -399,6 +659,9 @@ function connect(){
   client.on('connect',()=>{
     setWeb(true);$('btn-conn').textContent='Se déconnecter';log('Connecté au broker.');
     ['status','data','config','cmd/resp','ota'].forEach(s=>client.subscribe(base+'/'+s,{qos:1}));
+    // Sans la config, la matrice ne connaît pas les seuils et ne peut pas
+    // situer le scénario courant : on la réclame dès la connexion.
+    cmd({action:'getConfig'});
   });
   client.on('message',onMessage);
   client.on('close',()=>{setWeb(false);if(!wantConn)return;});
@@ -407,21 +670,29 @@ function connect(){
 function pub(suffix,payload,qos){ if(client&&client.connected)client.publish(base+'/'+suffix,payload,{qos:qos===undefined?1:qos}); }
 function cmd(o){ pub('cmd',JSON.stringify(o)); log('Commande : '+JSON.stringify(o)); }
 
-function onMessage(topic,payload){
+/* Le drapeau « retain » est capital pour l'OTA : status et ota/booted sont
+   publiés en messages retenus, et le broker les redistribue à CHAQUE
+   réabonnement — y compris lors d'une simple reconnexion du navigateur.
+   Un message retenu décrit donc le passé, jamais un événement en train de
+   se produire : le prendre pour une preuve de redémarrage fait conclure à
+   tort qu'un OTA a réussi. */
+function onMessage(topic,payload,packet){
   const t=topic.slice(base.length+1);
-  if(t==='status'){const s=payload.toString();setEsp(s);otaOnStatus(s);return;}
+  const retained=!!(packet&&packet.retain);
+  if(t==='status'){const s=payload.toString();setEsp(s);otaOnStatus(s,retained);return;}
   if(t==='data'){
     try{
       const d=JSON.parse(payload.toString());
       const ls=$('lastseen');ls.style.display='';ls.textContent='Dernière donnée '+new Date().toLocaleTimeString();
       const mb=$('sysmode');mb.textContent=d.mode||'--';mb.className='badge b-'+(d.mode?d.mode.toLowerCase():'standby');
-      otaOnData(d);
+      updateLive(d);
+      otaOnData(d,retained);
     }catch(e){}
     return;
   }
-  if(t==='config'){try{currentSp=JSON.parse(payload.toString());fillSpUI();}catch(e){}return;}
+  if(t==='config'){try{currentSp=JSON.parse(payload.toString());fillSpUI();refreshMatrixLabels();}catch(e){}return;}
   if(t==='cmd/resp'){try{const r=JSON.parse(payload.toString());log('ESP32 : '+r.msg);}catch(e){log('ESP32 : '+payload.toString());}return;}
-  if(t==='ota'){onOtaStatus(payload.toString());return;}
+  if(t==='ota'){onOtaStatus(payload.toString(),retained);return;}
 }
 
 /* ════════ OTA — upload sur ce site (Vercel Blob), puis l'ESP32 télécharge
@@ -470,23 +741,32 @@ function fmtDur(ms){const s=Math.round(ms/1000);return s<60?s+' s':Math.floor(s/
 /* Bandeau « firmware embarqué » — visible en permanence, pas seulement
    pendant un OTA : c'est ce qui permet de voir tout de suite qu'on tourne
    sur un firmware de test au lieu du firmware de production. */
-function setFwRunning(name){
-  if(name){ fwRunning=name; fwSeenAt=Date.now(); }
+// fwFreshAt : date de la dernière preuve NON RETENUE que ce firmware tourne.
+// Un message retenu renseigne le bandeau (mieux que « inconnu ») mais ne
+// vaut jamais comme preuve qu'un firmware vient de démarrer.
+let fwFreshAt=0;
+
+function setFwRunning(name,retained){
+  if(name){ fwRunning=name; fwSeenAt=Date.now(); if(!retained) fwFreshAt=fwSeenAt; }
   const known=!!fwRunning;
   set('fw-running',known?fwRunning:'inconnu');
   $('dot-fw').className='dot'+(known?' live':'');
   $('chip-fwseen').hidden=!known;
-  if(known) set('fw-seen',new Date(fwSeenAt).toLocaleTimeString());
+  if(known) set('fw-seen',new Date(fwSeenAt).toLocaleTimeString()+(fwFreshAt?'':' (message retenu)'));
 }
-function otaOnData(d){
+function otaOnData(d,retained){
   // Un firmware qui ne publie pas encore « fw » est identifié par son mode :
   // le firmware de test publie mode "TEST", la serre publie AUTO/MANUEL/…
-  setFwRunning(d.fw||(d.mode==='TEST'?'firmware de test':(d.mode?'Greenhouse (mode '+d.mode+')':null)));
-  if(ota&&ota.sawStart&&ota.step>=2) otaRebootObserved('données reçues du firmware');
+  const fw=d.fw||(d.mode==='TEST'?'firmware de test':(d.mode?'Greenhouse (mode '+d.mode+')':null));
+  setFwRunning(fw,retained);
+  if(retained||!ota||!ota.sawStart||ota.step<2) return;
+  otaRebootObserved('données reçues du firmware');
+  if(fw) otaConfirmFw(fw,'données publiées par le firmware');
 }
-function otaOnStatus(s){
-  if(s==='online'&&ota&&ota.step>=2&&ota.sawStart) otaRebootObserved('l\'ESP32 s\'est réannoncé en ligne');
-  if(s==='offline'&&ota&&ota.step>=2){ ota.sawOffline=true; otaRender(); }
+function otaOnStatus(s,retained){
+  if(retained||!ota||ota.step<2||!ota.sawStart) return;
+  if(s==='online')  otaRebootObserved('l\'ESP32 s\'est réannoncé en ligne');
+  if(s==='offline'){ ota.sawOffline=true; otaRender(); }
 }
 
 /* ── Rendu du suivi ── */
@@ -595,20 +875,27 @@ async function otaStart(){
 }
 
 /* Messages publiés par le firmware sur <base>/ota. */
-function onOtaStatus(raw){
+function onOtaStatus(raw,retained){
   let s;try{s=JSON.parse(raw);}catch(e){return;}
 
   if(s.fw&&s.state==='booted'){
-    setFwRunning(s.fw);
+    setFwRunning(s.fw,retained);
+    // Un « booted » retenu est celui d'un démarrage passé, redistribué par le
+    // broker à chaque réabonnement — il renseigne le bandeau mais ne prouve
+    // rien sur l'OTA en cours.
+    if(retained){ log('Firmware annoncé (message retenu) : '+s.fw); return; }
     log('Firmware démarré : '+s.fw+(s.boot?' (boot #'+s.boot+')':''));
-    if(ota&&ota.step>=2) otaSucceed(s.fw);
+    if(ota&&ota.step>=2){
+      otaRebootObserved('annonce de démarrage du firmware');
+      otaConfirmFw(s.fw,'le firmware s\'est annoncé au démarrage');
+    }
     return;
   }
-  if(!ota) return;
+  if(!ota||retained) return;
 
   if(s.state==='start'){
     ota.sawStart=true;
-    if(s.fw) setFwRunning(s.fw);
+    if(s.fw) setFwRunning(s.fw,false);
     otaStep(2,'l\'ESP32 a accusé réception et télécharge le binaire');
     let extra='';
     if(s.freeSpace!==undefined){
@@ -660,27 +947,71 @@ function onOtaStatus(raw){
   }
 }
 
-/* Un redémarrage observé sans avoir reçu {"state":"ok"} : c'est le cas des
-   firmwares qui redémarrent avant d'avoir pu publier leur succès. */
+/* Un redémarrage observé sans avoir reçu {"state":"ok"}. Ça prouve que la
+   carte a redémarré — RIEN DE PLUS. Tant que le firmware ne s'est pas
+   nommé lui-même dans un message frais, on ne sait pas ce qui a démarré :
+   la nouvelle image, ou l'ancienne partition après un échec. On avance donc
+   jusqu'à l'étape « retour en ligne » et on y attend la preuve. */
 function otaRebootObserved(how){
   if(!ota||ota.done||ota.step<2) return;
-  otaSucceed(fwRunning,how);
+  if(ota.step<3){
+    otaStep(3,'redémarrage détecté ('+how+')');
+    otaProgress(0.9);
+  }
+  if(ota.step===3){
+    otaStep(4,'en attente que le firmware démarré se nomme lui-même');
+    ota.rebootHow=how;
+    otaSetStatus('L\'ESP32 a redémarré ('+how+') — en attente de son identification…','var(--wn)');
+  }
 }
-function otaSucceed(fw,how){
-  if(!ota||ota.done) return;
+
+/* Seule voie vers un verdict vert : un firmware qui s'annonce dans un
+   message NON RETENU postérieur au lancement de l'OTA. */
+function otaConfirmFw(fw,how){
+  if(!ota||ota.done||ota.step<2||!fw) return;
+  if(fw===ota.fwBefore){ otaWrongFw(fw,how); return; }
   ota.done=true;
-  otaStep(4);
-  ota.step=5;                          // toutes les étapes validées
-  otaRender();
-  otaProgress(1);
+  ota.step=5; otaRender(); otaProgress(1);
   const dur=fmtDur(Date.now()-ota.startedAt);
-  otaSetStatus('✔ OTA terminé en '+dur+' — la carte tourne maintenant sur « '+(fw||'firmware inconnu')+' ».','var(--ok)');
-  const changed=fw&&ota.fwBefore&&fw!==ota.fwBefore;
-  otaDiag('<b>Mise à jour installée.</b> Fichier envoyé : <b>'+ota.name+'</b> ('+fmtBytes(ota.size)+').'
-    + '<br>Firmware avant : '+(ota.fwBefore||'inconnu')+' → maintenant : <b>'+(fw||'inconnu')+'</b>'
-    + (how?'<br>Confirmé par : '+how+'.':'')
-    + (changed?'':'<br>⚠ Le nom du firmware n\'a pas changé — vérifie que c\'est bien le binaire que tu voulais installer.'));
-  log('OTA réussi en '+dur+' — firmware actif : '+(fw||'inconnu'));
+  otaSetStatus('✔ OTA terminé en '+dur+' — la carte tourne maintenant sur « '+fw+' ».','var(--ok)');
+  otaDiag('<b>Mise à jour installée et confirmée par la carte.</b> Fichier envoyé : <b>'+ota.name+'</b> ('+fmtBytes(ota.size)+').'
+    + '<br>Firmware avant : '+(ota.fwBefore||'inconnu')+' → maintenant : <b>'+fw+'</b>'
+    + '<br>Confirmé par : '+how+'.');
+  log('OTA réussi en '+dur+' — firmware actif : '+fw);
+  otaEnd();
+}
+
+/* La carte a redémarré et s'est annoncée… sous son ANCIEN nom. C'est le
+   symptôme d'un retour sur l'ancienne partition : l'image écrite n'a pas
+   démarré. Surtout pas un succès. */
+function otaWrongFw(fw,how){
+  if(!ota||ota.done) return;
+  ota.done=true; ota.failedAt=4; otaRender();
+  otaSetStatus('✘ La carte est repartie sur « '+fw+' », le firmware d\'avant — la mise à jour n\'a pas pris.','var(--cr)');
+  otaDiag('<b>Le binaire a été écrit, mais ce n\'est pas lui qui tourne.</b> Après le redémarrage, la carte '
+    + 's\'annonce toujours comme <b>'+fw+'</b>, c\'est-à-dire le firmware d\'avant l\'OTA ('+how+').'
+    + '<ul><li>Le plus probable : la nouvelle image plante au démarrage et l\'ESP32 est revenu sur l\'ancienne partition.</li>'
+    + '<li>Vérifie les réglages de compilation du binaire envoyé (<b>'+ota.name+'</b>) : carte, taille de flash et '
+    + 'schéma de partitions doivent être identiques à ceux du firmware en place.</li>'
+    + '<li>Branche l\'USB et ouvre le Moniteur série à 115200 bauds : la cause du redémarrage y est écrite en clair.</li></ul>'
+    + '<li>Bonne nouvelle : la serre tourne toujours sur un firmware fonctionnel.</li>');
+  log('OTA : redémarrage sur l\'ancien firmware ('+fw+') — mise à jour non appliquée.');
+  otaEnd();
+}
+
+/* Redémarrage constaté, mais aucun firmware ne s'est nommé dans le délai.
+   Verdict explicitement indéterminé — c'est une information, pas un échec. */
+function otaUnconfirmed(){
+  if(!ota||ota.done) return;
+  ota.done=true; otaRender();
+  otaSetStatus('⚠ L\'ESP32 a redémarré mais ne s\'est pas identifié — résultat indéterminé.','var(--wn)');
+  otaDiag('<b>Le binaire a été écrit et la carte a redémarré, mais rien ne confirme quel firmware tourne.</b>'
+    + '<ul><li>Si le nouveau firmware ne publie pas de champ <code>fw</code>, ou n\'utilise pas ce broker/topic, '
+    + 'c\'est normal — regarde l\'écran de la carte.</li>'
+    + '<li>Si l\'écran reste figé sur le dernier message affiché avant le redémarrage, la nouvelle image ne '
+    + 'démarre probablement pas : l\'écran conserve sa dernière image tout seul, même sans microcontrôleur actif.</li>'
+    + '<li>Moniteur série USB à 115200 bauds : c\'est la seule réponse certaine.</li></ul>');
+  log('OTA : redémarrage constaté, firmware non identifié.');
   otaEnd();
 }
 
@@ -690,6 +1021,10 @@ function otaSucceed(fw,how){
 function otaTick(){
   if(!ota||ota.done) return;
   const now=Date.now(), el=now-ota.stepStartedAt, lim=OTA_TIMEOUTS[ota.step];
+  // Étape 4 : le redémarrage est acquis, on attendait l'identification du
+  // firmware. Passé le délai, on tranche « indéterminé » plutôt que de
+  // laisser la page en attente indéfinie.
+  if(ota.step===4&&lim&&el>lim){ otaUnconfirmed(); return; }
   if(ota.step>=1&&!ota.stalled&&lim&&el>lim){
     ota.stalled=true; otaRender();
     otaStalled();
