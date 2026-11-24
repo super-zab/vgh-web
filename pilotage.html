@@ -99,7 +99,7 @@ details.live summary::before{border-color:var(--ok);}
  text-transform:uppercase;color:var(--ok);background:#0c2b20;border-radius:999px;padding:3px 9px;}
 
 /* ── Matrice de décision du mode AUTO (jour) ──
-   Reprise directe de runControl() dans Greenhouse_V7.ino : les bandes de
+   Reprise directe de runControl() dans Greenhouse_Final.ino (V8) : les bandes de
    delta-T fixent le ventilateur, les bandes de VPD la brumisation. */
 .mtx-head{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:var(--mt);}
 .mtx-scroll{overflow-x:auto;}
@@ -246,7 +246,7 @@ input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
     <button onclick="cmd({action:'flushSpool'})">Rejouer le tampon</button>
     <button class="btn-danger" onclick="if(confirm('Effacer définitivement le tampon SD non envoyé ?'))cmd({action:'dropSpool'})">Vider le tampon</button>
   </div>
-  <div class="hint">⚠ En MANUEL, les durées de cycle viennent de <code>manPeriodS</code>/<code>manFanOnS</code>/<code>manMistOnS</code> dans la configuration ci-dessous — plus de réglage instantané fan/vanne, tout passe par des cycles temporisés.</div>
+  <div class="hint">⚠ En MANUEL, les durées de cycle viennent de <code>manPeriodS</code>/<code>manFanOnS</code>/<code>manMistOnS</code> dans la configuration ci-dessous — plus de réglage instantané fan/vanne, tout passe par des cycles temporisés. Le mode choisi (AUTO, MANUEL, VEILLE) est mémorisé par la carte et conservé après un redémarrage ou une coupure ; FALLBACK ne l'est pas et repasse seul en AUTO dès que les capteurs intérieurs répondent.</div>
 </section>
 
 <!-- ═══ MODE DE FONCTIONNEMENT ═══ -->
@@ -365,7 +365,7 @@ function applyLock(open){
   }catch(e){/* hors-ligne : reste verrouillé, l'utilisateur peut réessayer */}
 })();
 
-/* ── Schéma de configuration — CFG_FIELDS de Greenhouse_V7.ino ──
+/* ── Schéma de configuration — CFG_FIELDS de Greenhouse_Final.ino (V8) ──
    Deux familles, volontairement séparées à l'écran :
      SP_MODES  : durées de cycle propres à un mode. Un seul de ces groupes
                  pilote la serre à un instant donné — d'où la clé « mode »,
@@ -377,7 +377,9 @@ const SP_MODES=[
  {key:'day', g:'AUTO — cycle jour', f:[
   ['deltaLowC','Delta bas (int − ext)','°C',0.5,-20,20],['deltaHighC','Delta haut (int − ext)','°C',0.5,-20,20],
   ['dayPeriodS','Période jour','s',30,30,7200],
-  ['dayOnMidS','Ventilo ON — delta moyen','s',10,0,7200],['dayOnHighS','Ventilo ON — delta haut','s',10,0,7200]]},
+  ['dayOnMidS','Ventilo ON — delta moyen','s',10,0,7200],['dayOnHighS','Ventilo ON — delta haut','s',10,0,7200],
+  ['dayMistMidS','Brumisation ON — delta moyen (ou ventilo à l\'arrêt)','s',5,0,7200],
+  ['dayMistHighS','Brumisation ON — delta haut','s',5,0,7200]]},
  {key:'night', g:'Cycle nuit — AUTO et fallback', f:[
   ['nightPeriodS','Période nuit','s',30,30,7200],['nightOnS','Ventilo ON nuit','s',10,0,7200],
   ['nightMist','Brumisation nuit (0/1)',' ',1,0,1]]},
@@ -396,7 +398,7 @@ const SP_GLOBAL=[
   ['mistDeltaMinC','Delta min pour brumisation','°C',0.5,-30,30],['mistDeltaMaxC','Delta max pour brumisation','°C',0.5,-30,40]]},
  {g:'Jour/nuit — lux & horaires',f:[
   ['luxDay','Seuil lux jour','lx',50,0,20000],['luxNight','Seuil lux nuit','lx',50,0,20000],
-  ['dayStartHour','Début jour (secours horaire)','h',1,0,23],['dayEndHour','Fin jour (secours horaire)','h',1,0,23]]},
+  ['dayStartHour','Début jour (secours horaire, GMT)','h',1,0,23],['dayEndHour','Fin jour (secours horaire, GMT)','h',1,0,23]]},
  {g:'Sécurités',f:[
   ['staleS','Délai avant FALLBACK','s',30,30,86400],['valveMaxOnS','Ouverture continue max vanne','s',10,1,3600]]},
  {g:'Ventilation du coffret électronique',f:[
@@ -442,6 +444,14 @@ function buildSpUI(){
     .forEach(inp=>inp.addEventListener('input',updateSpDiff));
   buildMatrix();
 }
+/* Le firmware publie ses réglages tout-ou-rien en booléens JSON (true/false),
+   alors que les champs du formulaire sont numériques (0/1). Sans cette
+   conversion, un champ numérique refuse la valeur « true » et reste vide :
+   on ne voit pas l'état courant de nightMist, fbMist et mistUseVpd. */
+function normalizeConfig(c){
+  Object.keys(c).forEach(k=>{ if(typeof c[k]==='boolean') c[k]=c[k]?1:0; });
+  return c;
+}
 function fillSpUI(){
   if(!currentSp)return;
   SP_SCHEMA.forEach(grp=>grp.f.forEach(([k])=>{
@@ -479,7 +489,7 @@ function sendSetpoints(){
 
 /* ════════ MODE ACTIF ET MATRICE DE DÉCISION ════════
    Tout ce bloc ne fait que relire, côté site, ce que décide runControl()
-   dans Greenhouse_V7.ino — il ne recalcule aucune commande. En AUTO jour :
+   dans Greenhouse_Final.ino (V8) — il ne recalcule aucune commande. En AUTO jour :
 
      ventilateurs, par bande de delta-T (intérieur − extérieur)
        ΔT < deltaLowC                  → arrêt
@@ -497,10 +507,14 @@ function sendSetpoints(){
    « autorisé dans sa fenêtre », jamais « ventilo et vanne ensemble ». */
 let lastLive=null;
 
+/* « on » : durée ventilateur de la bande ; « mist » : durée de brumisation
+   de la bande, distincte depuis la V8. En delta bas le ventilateur est à
+   l'arrêt, mais une brumisation autorisée par le VPD garde la durée
+   minimale dayMistMidS. */
 const MTX_ROWS=[
- {k:'low', th:'Delta bas',   sub:'ΔT < <b>%low%</b>',              fan:false},
- {k:'mid', th:'Delta moyen', sub:'<b>%low%</b> ≤ ΔT < <b>%high%</b>', fan:true, on:'dayOnMidS'},
- {k:'high',th:'Delta haut',  sub:'ΔT ≥ <b>%high%</b>',             fan:true, on:'dayOnHighS'}
+ {k:'low', th:'Delta bas',   sub:'ΔT < <b>%low%</b>',              fan:false,               mist:'dayMistMidS'},
+ {k:'mid', th:'Delta moyen', sub:'<b>%low%</b> ≤ ΔT < <b>%high%</b>', fan:true, on:'dayOnMidS',  mist:'dayMistMidS'},
+ {k:'high',th:'Delta haut',  sub:'ΔT ≥ <b>%high%</b>',             fan:true, on:'dayOnHighS', mist:'dayMistHighS'}
 ];
 const MTX_COLS=[
  {k:'low', th:'VPD bas',   sub:'VPD < <b>%mid%</b>',                    mist:'off'},
@@ -526,7 +540,9 @@ function buildMatrix(){
       const m=c.mist==='on' ?'<span class="io on">M ON</span>'
             :c.mist==='off'?'<span class="io">M OFF</span>'
                            :'<span class="io cond">M ON *</span>';
-      h+='<td id="mx-'+r.k+'-'+c.k+'">'+v+m+'</td>';
+      // Durées réellement appliquées dans cette case, relues de la config.
+      h+='<td id="mx-'+r.k+'-'+c.k+'">'+v+m+'<small class="cdur" data-fan="'+(r.fan?r.on:'')
+        +'" data-mist="'+(c.mist==='off'?'':r.mist)+'">—</small></td>';
     });
     h+='</tr>';
   });
@@ -541,6 +557,18 @@ function refreshMatrixLabels(){
   document.querySelectorAll('#mtx .csub').forEach(e=>{
     e.innerHTML=e.dataset.tpl.replace(/%mid%/g,spv('vpdMistMid',2,' kPa'))
                              .replace(/%high%/g,spv('vpdMistHigh',2,' kPa'));
+  });
+  // Le firmware plafonne chaque durée à la demi-période (opposeWindows) :
+  // on affiche la valeur effective, pas la valeur saisie.
+  const dur=k=>{
+    if(!k) return '—';
+    if(!currentSp||currentSp[k]===undefined) return '…';
+    const half=Math.floor(Number(currentSp.dayPeriodS||0)/2);
+    const v=Number(currentSp[k]);
+    return (half>0&&v>half?half:v)+' s';
+  };
+  document.querySelectorAll('#mtx .cdur').forEach(e=>{
+    e.textContent='V '+dur(e.dataset.fan)+' · M '+dur(e.dataset.mist);
   });
   if(lastLive)updateLive(lastLive);
 }
@@ -622,8 +650,9 @@ function updateLive(d){
 
   let n='';
   if(!useVpd){
-    n='<b>mistUseVpd = 0</b> : la brumisation ne regarde pas le VPD, elle suit la durée du '
-     +'ventilateur. Les colonnes ci-dessus sont sans effet tant que ce réglage reste à 0.';
+    n='<b>mistUseVpd = 0</b> : la brumisation ne regarde pas le VPD, elle s\'ouvre dès que les '
+     +'ventilateurs tournent, avec sa propre durée (<b>'+spv('dayMistMidS',0,' s')+'</b> en delta moyen, <b>'
+     +spv('dayMistHighS',0,' s')+'</b> en delta haut). Les colonnes ci-dessus sont sans effet tant que ce réglage reste à 0.';
   } else if(!row||!col){
     const miss=[dt==null?'le delta int/ext':null,vpd==null?'le VPD':null].filter(Boolean);
     n='Case indéterminée : '+(miss.length?miss.join(' et ')+' n\'est pas disponible':'donnée manquante')
@@ -637,7 +666,9 @@ function updateLive(d){
   }
   n+='<br>* Colonne VPD moyen : la brumisation n\'est autorisée que si le delta reste dans la '
    +'fenêtre <b>'+spv('mistDeltaMinC',1,' °C')+'</b> → <b>'+spv('mistDeltaMaxC',1,' °C')+'</b>. '
-   +'Les fenêtres ventilateur et brumisation sont décalées d\'une demi-période : elles ne se recouvrent jamais.';
+   +'Les fenêtres ventilateur et brumisation sont décalées d\'une demi-période : elles ne se recouvrent jamais. '
+   +'Chaque durée est plafonnée à la demi-période (<b>'+(currentSp&&currentSp.dayPeriodS!==undefined
+       ?Math.floor(Number(currentSp.dayPeriodS)/2)+' s':'dayPeriodS / 2')+'</b>) par le firmware.';
   if(!cfgOk)n+='<br>⚠ Configuration pas encore reçue de l\'ESP32 — les seuils affichés sont symboliques. '
    +'Clique sur « Recharger config ».';
   note.innerHTML=n;
@@ -697,7 +728,7 @@ function onMessage(topic,payload,packet){
     }catch(e){}
     return;
   }
-  if(t==='config'){try{currentSp=JSON.parse(payload.toString());fillSpUI();refreshMatrixLabels();}catch(e){}return;}
+  if(t==='config'){try{currentSp=normalizeConfig(JSON.parse(payload.toString()));fillSpUI();refreshMatrixLabels();}catch(e){}return;}
   if(t==='cmd/resp'){try{const r=JSON.parse(payload.toString());log('ESP32 : '+r.msg);}catch(e){log('ESP32 : '+payload.toString());}return;}
   if(t==='ota'){onOtaStatus(payload.toString(),retained);return;}
 }
