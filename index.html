@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0e0f11">
 <title>Serre VGH — Contrôle à distance</title>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <style>
@@ -113,17 +114,74 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
 .zp-note{font-size:11px;color:var(--mt2);margin-top:10px;line-height:1.5;}
 .formula{font-size:10px;color:var(--mt2);margin-top:5px;font-family:ui-monospace,'SF Mono',monospace;}
 
-@media(max-width:860px){
-  #scene-wrap,#zpanel{display:none!important;}
-  #scene-fallback{display:block;}
+/* ═══ MOBILE ═══
+   Règles communes aux trois pages. Les champs passent à 16 px (en dessous,
+   iOS zoome la page à chaque saisie) et les boutons à 44 px de haut (cible
+   tactile minimale). */
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+a,button,summary{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+a.chip{text-decoration:none;}
+.nav-s{display:none;}
+.mini{width:110px;padding:4px 8px;font-size:11px;}
+@media(max-width:700px){
+  body{padding:0 12px 32px;}
+  .pagenav{position:sticky;top:0;z-index:20;width:auto;margin:0 -12px 14px;padding:8px 12px;
+   border:0;border-bottom:1px solid var(--bd);border-radius:0;
+   background:rgba(14,15,17,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}
+  .pagenav-item{flex:1;display:flex;align-items:center;justify-content:center;min-height:40px;
+   padding:6px 8px;font-size:13px;white-space:nowrap;}
+  .pagenav-item.active{background:var(--bg2);box-shadow:0 0 0 1px var(--bd2) inset;}
+  .nav-l{display:none;}.nav-s{display:inline;}
+  header{gap:10px;margin-bottom:14px;}
+  .brand h1{font-size:18px;}
+  .status{gap:6px;}
+  .chip{padding:6px 10px;}
+  section{padding:14px 12px;margin-bottom:12px;scroll-margin-top:68px;}
+  .sec-title{flex-wrap:wrap;row-gap:3px;margin-bottom:12px;}
+  input,select{font-size:16px;min-height:44px;}
+  button{min-height:44px;font-size:14px;}
+  .field input{width:100%;min-width:0;}
+  .conn-grid .field:first-child,.conn-grid>button{grid-column:1/-1;}
+  .mini{width:128px;padding:8px 10px;font-size:16px;}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .card{padding:12px;}
+  .val{font-size:23px;}
 }
+
+/* ── Vue d'ensemble sur petit écran ──
+   Le schéma isométrique est illisible sous 860 px : il est remplacé par une
+   grille de cartes. Toucher une carte ouvre le même détail par capteur que
+   le zoom du schéma, présenté en volet bas d'écran. */
+#tap-hint,#zp-backdrop{display:none;}
+#scene-fallback .lbl{display:flex;justify-content:space-between;gap:6px;}
+#scene-fallback .cnt{color:var(--ac);letter-spacing:0;white-space:nowrap;}
+@media(max-width:860px){
+  #scene-wrap{display:none!important;}
+  #scene-fallback{display:grid;}
+  #tap-hint{display:block;font-size:11px;color:var(--mt2);margin:-4px 0 10px;}
+  .card.tap{cursor:pointer;}
+  .card.tap:active,.card.tap:focus-visible{border-color:var(--ac);outline:none;}
+  #zp-backdrop{display:block;position:fixed;inset:0;z-index:49;background:rgba(0,0,0,.6);touch-action:none;}
+  #zpanel{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0 auto;max-width:560px;
+   max-height:80vh;max-height:80dvh;overflow-y:auto;overscroll-behavior:contain;
+   border-width:1px 0 0;border-radius:16px 16px 0 0;background:var(--panel);
+   padding:16px 14px calc(18px + env(safe-area-inset-bottom));
+   box-shadow:0 -10px 34px rgba(0,0,0,.55);animation:sheetIn .24s ease;}
+  .zp-head{align-items:flex-start;}
+  .zp-head h3{flex:1;font-size:15px;line-height:1.3;}
+  .zp-close{order:1;min-height:36px;white-space:nowrap;}
+  .zp-head .meta{order:2;flex-basis:100%;}
+  .zp-head .spread{order:3;flex-basis:100%;margin-left:0;}
+}
+@keyframes sheetIn{from{transform:translateY(100%);}to{transform:none;}}
+@media(prefers-reduced-motion:reduce){#zpanel{animation:none;}html{scroll-behavior:auto;}}
 </style>
 </head>
 <body>
 
 <!-- ═══ NAVIGATION ═══ -->
 <nav class="pagenav">
-  <a href="/" class="pagenav-item active">Visualisation en direct</a>
+  <a href="/" class="pagenav-item active"><span class="nav-l">Visualisation en direct</span><span class="nav-s">En direct</span></a>
   <a href="/historique" class="pagenav-item">Historique</a>
   <a href="/pilotage" class="pagenav-item">Pilotage</a>
 </nav>
@@ -135,7 +193,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
     <p>Lecture seule · liaison chiffrée TLS via MQTT</p>
   </div>
   <div class="status">
-    <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
+    <a class="chip" href="#conn" title="Aller à la connexion au broker"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></a>
     <span class="chip"><span class="dot" id="dot-esp"></span>ESP32&nbsp;<strong id="st-esp">inconnu</strong></span>
     <span class="chip">Mode <span id="sysmode" class="badge b-standby">--</span></span>
     <span class="chip" id="lastseen" style="display:none"></span>
@@ -644,16 +702,19 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
     <div class="zp-rows" id="zp-rows"></div>
     <div class="zp-note" id="zp-note"></div>
   </div>
+  <div id="zp-backdrop" hidden></div>
+  <div id="tap-hint">Toucher une mesure pour voir chaque capteur</div>
   <div id="scene-fallback" class="grid">
-    <div class="card"><div class="lbl">Lumière</div><div><span class="val" id="m-lux">--</span><span class="unit">lx</span></div></div>
-    <div class="card"><div class="lbl">Temp air</div><div><span class="val" id="m-temp">--</span><span class="unit">°C</span></div></div>
-    <div class="card"><div class="lbl">Delta int − ext</div><div><span class="val" id="m-delta">--</span><span class="unit">°C</span></div></div>
-    <div class="card"><div class="lbl">Humidité</div><div><span class="val" id="m-rh">--</span><span class="unit">%</span></div></div>
-    <div class="card"><div class="lbl">Canopée</div><div><span class="val" id="m-amg">--</span><span class="unit">°C</span></div></div>
-    <div class="card"><div class="lbl">Indice UV</div><div><span class="val" id="m-uv">--</span></div></div>
-    <div class="card"><div class="lbl">CO₂</div><div><span class="val" id="m-co2">--</span><span class="unit">ppm</span></div></div>
-    <div class="card"><div class="lbl">Feuille − témoin</div><div><span class="val" id="m-leaf">--</span><span class="unit">°C</span></div></div>
-    <div class="card"><div class="lbl">Ventilation</div><div><span class="val" id="m-fan">--</span></div></div>
+    <div class="card tap" data-zoom="temp" role="button" tabindex="0"><div class="lbl"><span>Temp air</span> <span class="cnt">×5 ›</span></div><div><span class="val" id="m-temp">--</span><span class="unit">°C</span></div><div class="note" id="m-tempnote">--</div></div>
+    <div class="card tap" data-zoom="rh" role="button" tabindex="0"><div class="lbl"><span>Humidité</span> <span class="cnt">×5 ›</span></div><div><span class="val" id="m-rh">--</span><span class="unit">%</span></div><div class="note">moyenne intérieure</div></div>
+    <div class="card"><div class="lbl"><span>Delta int − ext</span></div><div><span class="val" id="m-delta">--</span><span class="unit">°C</span></div><div class="note" id="m-deltanote">--</div></div>
+    <div class="card tap" data-zoom="lux" role="button" tabindex="0"><div class="lbl"><span>Lumière</span> <span class="cnt">×2 ›</span></div><div><span class="val" id="m-lux">--</span><span class="unit">lx</span></div><div class="note" id="m-luxnote">--</div></div>
+    <div class="card tap" data-zoom="co2" role="button" tabindex="0"><div class="lbl"><span>CO₂</span> <span class="cnt">×2 ›</span></div><div><span class="val" id="m-co2">--</span><span class="unit">ppm</span></div><div class="note" id="m-co2note">--</div></div>
+    <div class="card tap" data-zoom="uv" role="button" tabindex="0"><div class="lbl"><span>Indice UV</span> <span class="cnt">×2 ›</span></div><div><span class="val" id="m-uv">--</span></div><div class="note">intérieur</div></div>
+    <div class="card tap" data-zoom="amg" role="button" tabindex="0"><div class="lbl"><span>Canopée</span> <span class="cnt">×2 ›</span></div><div><span class="val" id="m-amg">--</span><span class="unit">°C</span></div><div class="note" id="m-amgnote">--</div></div>
+    <div class="card tap" data-zoom="leaf" role="button" tabindex="0"><div class="lbl"><span>Feuille − témoin</span> <span class="cnt" id="m-leafcnt">×-- ›</span></div><div><span class="val" id="m-leaf">--</span><span class="unit">°C</span></div><div class="note" id="m-leafnote">--</div></div>
+    <div class="card tap" data-zoom="fan" role="button" tabindex="0"><div class="lbl"><span>Ventilation</span> <span class="cnt">×2 ›</span></div><div><span class="val" id="m-fan">--</span></div><div class="note" id="m-fannote">--</div></div>
+    <div class="card"><div class="lbl"><span>Brumisation</span></div><div><span class="val" id="m-valve">--</span></div><div class="note" id="m-valvenote">--</div></div>
   </div>
 </section>
 
@@ -693,7 +754,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
 </section>
 
 <!-- ═══ CONNEXION BROKER ═══ -->
-<section>
+<section id="conn">
   <div class="sec-title">Connexion au broker MQTT <span class="fill"></span><span class="aside">HiveMQ Cloud</span></div>
   <div class="conn-grid">
     <div class="field"><label>Cluster (ex. abc123.s1.eu.hivemq.cloud)</label><input id="c-host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud" value="cf16d20ab8c24da6898f5704c619ae01.s1.eu.hivemq.cloud"></div>
@@ -702,7 +763,7 @@ footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-he
     <button class="btn-ok" id="btn-conn" onclick="toggleConn()">Se connecter</button>
   </div>
   <div class="sub">
-    Topic de base <input id="c-base" value="vgh/gh1" style="width:110px;padding:4px 8px;font-size:11px">
+    Topic de base <input id="c-base" class="mini" value="vgh/gh1">
     — identifiants mémorisés dans ce navigateur uniquement.
   </div>
 </section>
@@ -942,13 +1003,20 @@ function updateScene(d){
   }
   if(focused) renderPanel(focused);
 
-  /* repli mobile */
-  setTxt('m-lux',d.luxIn==null?'--':Math.round(d.luxIn));setTxt('m-temp',fnum(d.tempIn,1));
-  setTxt('m-delta',dt==null?'--':(dt>0?'+':'')+fnum(dt,1));
-  setTxt('m-rh',fnum(d.rhIn,0));setTxt('m-amg',fnum(d.leafAmgMaxC,1));
-  setTxt('m-uv',fnum(d.uvIn,2));setTxt('m-co2',d.co2In==null?'--':Math.round(d.co2In));
-  setTxt('m-leaf',d.leafAirDeltaC==null?'--':(d.leafAirDeltaC>0?'+':'')+fnum(d.leafAirDeltaC,2));
-  setTxt('m-fan',d.fan?'MARCHE':'ARRÊT');
+  /* repli mobile : mêmes valeurs et mêmes couleurs que le schéma */
+  ['temp','rh','delta','lux','co2','uv','amg','leaf','fan','valve'].forEach(k=>{
+    const a=$('sv-'+k), b=$('m-'+k);
+    if(a&&b){b.textContent=a.textContent;b.style.color=a.style.fill;}
+  });
+  setTxt('m-tempnote','ext '+fnum(d.tempOut,1)+' °C');
+  setTxt('m-deltanote',d.fanReason&&/^dT/.test(d.fanReason)?'bande '+d.fanReason:'int − ext');
+  setTxt('m-luxnote','mode '+(d.isDay?'jour':'nuit'));
+  setTxt('m-co2note','ext '+(d.co2Out==null?'--':Math.round(d.co2Out))+' ppm');
+  setTxt('m-amgnote','min '+fnum(d.leafAmgMinC,1)+' · moy '+fnum(d.leafAmgAvgC,1));
+  setTxt('m-leafnote','témoin '+fnum(d.witnessC,1)+' °C');
+  setTxt('m-leafcnt','×'+probes.length+' ›');
+  setTxt('m-fannote',d.fanReason||'--');
+  setTxt('m-valvenote',vo?'impulsion en cours':'blocage : '+(d.mistReason||'--'));
 }
 
 /* ════════ INDICATEURS CALCULÉS ════════ */
@@ -1008,6 +1076,7 @@ function zoomTo(id){
   showZg(id);
   animateTo(META[id].view,520);
   renderPanel(id);
+  $('zp-backdrop').hidden=false;
 }
 function closeZoom(){
   focused=null;
@@ -1016,6 +1085,7 @@ function closeZoom(){
   showZg(null);
   animateTo(BASE,460);
   $('zpanel').hidden=true;
+  $('zp-backdrop').hidden=true;
 }
 function renderProbePanel(){
   const d=lastData||{};
@@ -1114,6 +1184,16 @@ scene.addEventListener('keydown',e=>{
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&focused)closeZoom();});
 $('zp-close').addEventListener('click',closeZoom);
+/* Petit écran : les cartes de repli ouvrent le même détail, en volet bas. */
+$('zp-backdrop').addEventListener('click',closeZoom);
+$('scene-fallback').addEventListener('click',e=>{
+  const c=e.target.closest('[data-zoom]');
+  if(c) zoomTo(c.getAttribute('data-zoom'));
+});
+$('scene-fallback').addEventListener('keydown',e=>{
+  const c=e.target.closest('[data-zoom]');
+  if(c&&(e.key==='Enter'||e.key===' ')){e.preventDefault();zoomTo(c.getAttribute('data-zoom'));}
+});
 
 /* ════════ CONNEXION MQTT ════════ */
 function toggleConn(){ if(client){wantConn=false;client.end(true);client=null;setWeb(false);$('btn-conn').textContent='Se connecter';} else connect(); }
