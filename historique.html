@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -104,7 +104,6 @@ a.chip{text-decoration:none;}
   .val{font-size:23px;}
 }
 
-.tok{width:150px;}
 @media(max-width:700px){
   .presets{gap:8px;}
   .presets button{flex:1 1 30%;padding-left:6px;padding-right:6px;}
@@ -122,20 +121,27 @@ a.chip{text-decoration:none;}
   #s-log td{padding:0;border:0;}
   #s-log td.detail,#s-log td.msg{flex-basis:100%;}
 }
+html.pending body{visibility:hidden;}
+.pagenav-out{margin-left:6px;padding:7px 12px;min-height:0;border:0;border-radius:999px;background:none;
+ color:var(--mt2);font-size:12px;font-weight:500;}
+.pagenav-out:hover:not(:disabled){background:none;color:var(--cr);}
+.vgh-err{margin:12px 0;padding:10px 12px;border:1px solid var(--cr);border-radius:9px;color:var(--cr);font-size:12.5px;}
+@media(max-width:700px){.pagenav-out{flex:none;margin-left:2px;padding:6px 8px;min-height:40px;font-size:12.5px;}}
 </style>
+<script src="/vgh.js"></script>
 </head>
 <body>
 
 <!-- ═══ NAVIGATION ═══ -->
 <nav class="pagenav">
-  <a href="/" class="pagenav-item"><span class="nav-l">Visualisation en direct</span><span class="nav-s">En direct</span></a>
+  <a href="/direct" class="pagenav-item"><span class="nav-l">Visualisation en direct</span><span class="nav-s">En direct</span></a>
   <a href="/historique" class="pagenav-item active">Historique</a>
   <a href="/pilotage" class="pagenav-item">Pilotage</a>
 </nav>
 
 <header>
   <div class="brand">
-    <h1>Serre VGH — Historique</h1>
+    <h1><span data-gh-name>Serre VGH</span> — Historique</h1>
     <p>Données enregistrées en continu, même site fermé</p>
   </div>
 </header>
@@ -155,7 +161,6 @@ a.chip{text-decoration:none;}
   <div class="row form-grid">
     <div class="field"><label for="f-from">Du</label><input type="datetime-local" id="f-from"></div>
     <div class="field"><label for="f-to">Au</label><input type="datetime-local" id="f-to"></div>
-    <div class="field"><label for="f-token">Jeton d'accès</label><input type="password" id="f-token" placeholder="VGH_API_TOKEN" class="tok"></div>
     <div class="field act"><label>&nbsp;</label><button id="b-load" class="on">Charger</button></div>
     <div class="field act half"><label>&nbsp;</label><button id="b-csv">Export CSV mesures</button></div>
     <div class="field act half"><label>&nbsp;</label><button id="b-csv-ev">Export CSV consignes</button></div>
@@ -218,12 +223,6 @@ const toLocalInput = (d) =>
   `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const fmtNum = (v, dp = 1) => (v === null || v === undefined) ? '—' : Number(v).toFixed(dp);
 
-// Le jeton est mémorisé dans le navigateur, comme les identifiants MQTT
-// du site principal.
-$('f-token').value = localStorage.getItem('vgh-api-token') || '';
-$('f-token').addEventListener('change', (e) =>
-  localStorage.setItem('vgh-api-token', e.target.value.trim()));
-
 function setRange(hours) {
   const to = new Date();
   $('f-to').value = toLocalInput(to);
@@ -235,10 +234,9 @@ document.querySelectorAll('button[data-h]').forEach((b) =>
   b.addEventListener('click', () => { setRange(+b.dataset.h); load(); }));
 
 function params() {
-  const token = $('f-token').value.trim();
   const from = new Date($('f-from').value).toISOString();
   const to   = new Date($('f-to').value).toISOString();
-  return new URLSearchParams({ from, to, token });
+  return new URLSearchParams({ from, to });
 }
 
 function say(text, isErr) {
@@ -291,7 +289,6 @@ const line = (label, data, color, yAxisID) => ({
 
 // ── Chargement ────────────────────────────────────────────────────────
 async function load() {
-  if (!$('f-token').value.trim()) { say('Renseigne le jeton d\'accès (variable VGH_API_TOKEN sur Vercel).', true); return; }
   say('Chargement…');
   $('b-load').disabled = true;
 
@@ -301,12 +298,23 @@ async function load() {
       fetch('/api/history?' + p),
       fetch('/api/events?' + p),
     ]);
+    if (hRes.status === 401) return VGH.expired();
     if (!hRes.ok) throw new Error((await hRes.json()).error || `Erreur ${hRes.status}`);
     const hist = await hRes.json();
     const events = eRes.ok ? await eRes.json() : { activity: [] };
 
     if (!hist.rows.length) {
-      say('Aucune donnée sur cette période. Si le collecteur vient d\'être installé, laisse-lui quelques minutes.', false);
+      // Le serveur précise ce que la base contient pour cette serre : cela
+      // distingue une période sans mesure d'un collecteur qui n'écrit plus.
+      if (!hist.total) {
+        say('La base ne contient encore aucune mesure pour cette serre : le collecteur n\'a rien '
+          + 'enregistré, ou le site ne lit pas la même base que lui (DATABASE_URL sur Vercel).', true);
+      } else {
+        const d = new Date(hist.last);
+        say(`Aucune mesure sur cette période. La dernière reçue date du ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} `
+          + `à ${pad(d.getHours())}:${pad(d.getMinutes())} (${hist.total} mesures en base) — `
+          + 'la serre ou le collecteur n\'envoie plus rien depuis.', new Date() - d > 3600e3);
+      }
       ['s-summary','s-charts','s-charts2','s-charts3','s-charts4','s-charts5','s-log']
         .forEach((id) => $(id).style.display = 'none');
       return;
@@ -474,8 +482,6 @@ function renderLog(activity) {
 // est encore trop lourde (413), elle est redemandée deux fois plus courte.
 // Les erreurs s'affichent dans la page au lieu d'ouvrir une page JSON brute.
 async function exportCsv(what) {
-  const token = $('f-token').value.trim();
-  if (!token) { say('Renseigne le jeton d\'accès avant d\'exporter.', true); return; }
   const from = new Date($('f-from').value), to = new Date($('f-to').value);
   if (isNaN(from) || isNaN(to) || from >= to) {
     say('Période invalide : vérifie les dates « Du » et « Au ».', true); return;
@@ -492,7 +498,8 @@ async function exportCsv(what) {
       say(`Export en cours… ${Math.round((a - t0) / (t1 - t0) * 100)} %`);
       const p = new URLSearchParams({
         what, from: new Date(a).toISOString(), to: new Date(b).toISOString() });
-      const r = await fetch('/api/export?' + p, { headers: { 'x-vgh-token': token } });
+      const r = await fetch('/api/export?' + p);
+      if (r.status === 401) return VGH.expired();
       if (r.status === 413 && step > 3600e3) { step = Math.ceil(step / 2); continue; }
       if (!r.ok) {
         let m = `Erreur ${r.status}`;
@@ -507,14 +514,17 @@ async function exportCsv(what) {
       }
       a = b + 1;
     }
-    if (header === null) { say('Aucune donnée à exporter sur cette période.'); return; }
+    if (header === null) {            // rien à exporter : load() dit pourquoi
+      btns.forEach((b) => b.disabled = false);
+      return load();
+    }
 
     // BOM UTF-8 en tête : Excel reconnaît les accents sans manipulation.
     const blob = new Blob(['\uFEFF', header, '\r\n', parts.join('\r\n')],
                           { type: 'text/csv;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `vgh-gh1-${what}-${toLocalInput(from).slice(0, 10)}_${toLocalInput(to).slice(0, 10)}.csv`;
+    link.download = `vgh-${VGH.session ? VGH.session.gh : 'serre'}-${what}-${toLocalInput(from).slice(0, 10)}_${toLocalInput(to).slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -530,7 +540,7 @@ $('b-csv').addEventListener('click',    () => exportCsv('telemetry'));
 $('b-csv-ev').addEventListener('click', () => exportCsv('events'));
 $('b-load').addEventListener('click', load);
 
-if ($('f-token').value.trim()) load();
+VGH.ready.then(load);
 </script>
 </body>
 </html>

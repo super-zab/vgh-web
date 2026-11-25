@@ -1,4 +1,4 @@
-/* POST /api/upload?token=…&name=firmware.bin
+/* POST /api/upload?name=firmware.bin
  *
  * Upload du binaire firmware pour l'OTA du firmware V5 : l'ESP32 télécharge
  * lui-même le .bin depuis une URL HTTPS publique (voir l'action "ota" dans
@@ -10,12 +10,12 @@
  * une fois sur le projet Vercel (Storage → Create Database → Blob).       */
 
 import { put } from '@vercel/blob';
-import { denied } from './_db.js';
+import { auth } from './_auth.js';
 
 const MAX_BYTES = 4_000_000;   // limite de taille du corps des Vercel Functions
 
 export default async function handler(req, res) {
-  if (denied(req, res)) return;
+  if (!auth(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST uniquement' }); return; }
 
   try {

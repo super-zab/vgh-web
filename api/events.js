@@ -1,15 +1,18 @@
-/* GET /api/events?from=…&to=…&gh=gh1&token=…
+/* GET /api/events?from=…&to=…
  *
  * Journal des commandes, changements de configuration et connexions/
  * déconnexions de la serre, sur une même ligne de temps (firmware V5).   */
 
-import { sql, denied, range } from './_db.js';
+import { sql, range } from './_db.js';
+import { auth } from './_auth.js';
 
 export default async function handler(req, res) {
   try {
-    if (denied(req, res)) return;
+    const who = auth(req, res);
+    if (!who) return;
+    const { gh } = who;
 
-    const { from, to, gh } = range(req);
+    const { from, to } = range(req);
 
     const [activity, config] = await Promise.all([
       sql`

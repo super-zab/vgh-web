@@ -1,10 +1,11 @@
-/* GET /api/export?from=…&to=…&gh=gh1&what=telemetry|events&token=…
+/* GET /api/export?from=…&to=…&what=telemetry|events
  *
  * Export CSV, ouvrable directement dans Excel ou LibreOffice.
  * Séparateur point-virgule et BOM UTF-8 : Excel en français reconnaît
  * les colonnes et les accents sans manipulation.                        */
 
-import { sql, denied, range } from './_db.js';
+import { sql, range } from './_db.js';
+import { auth } from './_auth.js';
 
 const csvCell = (v) => {
   if (v === null || v === undefined) return '';
@@ -28,9 +29,11 @@ const MAX_BYTES = 4_000_000;
 
 export default async function handler(req, res) {
   try {
-    if (denied(req, res)) return;
+    const who = auth(req, res);
+    if (!who) return;
+    const { gh } = who;
 
-    const { q, from, to, gh } = range(req);
+    const { q, from, to } = range(req);
     const what = q.get('what') || 'telemetry';
 
     const rows = what === 'events'

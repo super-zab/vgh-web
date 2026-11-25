@@ -1,4 +1,4 @@
-/* GET /api/history?from=…&to=…&gh=gh1&resolution=auto&token=…
+/* GET /api/history?from=…&to=…&resolution=auto
  *
  * Renvoie la télémétrie sur une plage de temps (firmware V5 — table
  * `readings`). Au-delà de 3 jours, bascule automatiquement sur les
@@ -6,13 +6,26 @@
  * dizaines de milliers de lignes au navigateur. Forçable via
  * resolution=raw | hourly.                                              */
 
-import { sql, denied, range } from './_db.js';
+import { sql, range } from './_db.js';
+import { auth } from './_auth.js';
+
+/* Période vide : on dit aussi ce que la base contient pour cette serre.
+ * « Aucune donnée » ne veut pas dire la même chose selon que le collecteur
+ * n'a jamais rien écrit ou qu'il s'est arrêté il y a trois jours. */
+async function empty(res, gh, resolution) {
+  const [info] = await sql`
+    SELECT count(*)::int AS total, max(received_at) AS last
+    FROM readings WHERE device_id = ${gh}`;
+  res.status(200).json({ resolution, count: 0, rows: [], total: info.total, last: info.last });
+}
 
 export default async function handler(req, res) {
   try {
-    if (denied(req, res)) return;
+    const who = auth(req, res);
+    if (!who) return;
+    const { gh } = who;
 
-    const { q, from, to, gh, hours } = range(req);
+    const { q, from, to, hours } = range(req);
     const asked = q.get('resolution') || 'auto';
     const hourly = asked === 'hourly' || (asked === 'auto' && hours > 72);
 
@@ -25,6 +38,7 @@ export default async function handler(req, res) {
         FROM readings_hourly
         WHERE device_id = ${gh} AND hour >= ${from.toISOString()} AND hour <= ${to.toISOString()}
         ORDER BY hour`;
+      if (!rows.length) return empty(res, gh, 'hourly');
       return res.status(200).json({ resolution: 'hourly', count: rows.length, rows });
     }
 
@@ -49,6 +63,7 @@ export default async function handler(req, res) {
         AND received_at <= ${to.toISOString()}
       ORDER BY received_at
       LIMIT 20000`;
+    if (!rows.length) return empty(res, gh, 'raw');
     res.status(200).json({ resolution: 'raw', count: rows.length, rows });
 
   } catch (e) {

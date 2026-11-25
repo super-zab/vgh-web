@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -141,12 +141,6 @@ table.mtx td.hit{background:#0c2b20;border-color:var(--ok);box-shadow:0 0 0 1px 
 #log{font-family:ui-monospace,'SF Mono',monospace;font-size:11px;color:var(--mt);background:#0f1113;
  border:1px solid var(--bd);border-radius:8px;padding:12px;max-height:170px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;}
 
-.lock{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#0f1113;
- border:1px dashed var(--bd2);border-radius:10px;padding:16px;}
-.lock .ico{width:30px;height:30px;border-radius:8px;background:#1e2226;display:grid;place-items:center;
- color:var(--wn);font-size:15px;}
-.lock p{font-size:12px;color:var(--mt);line-height:1.5;flex:1;min-width:220px;}
-.lock-err{font-size:11.5px;color:var(--cr);margin-top:8px;}
 
 footer{font-size:11px;color:var(--mt2);margin-top:18px;text-align:center;line-height:1.6;}
 input[type=file]{border:none;background:none;padding:6px 0;font-size:12px;}
@@ -187,9 +181,6 @@ a.chip{text-decoration:none;}
 /* .hint était en flex : chaque <code> devenait une colonne à part entière. */
 .hint{display:block;overflow-wrap:anywhere;}
 @media(max-width:700px){
-  .lock{padding:14px;gap:10px;}
-  .lock p{min-width:0;flex-basis:calc(100% - 42px);overflow-wrap:anywhere;}
-  .lock input,.lock button{flex:1 1 100%;}
   .cmd-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .cmd-row>span{grid-column:1/-1;}
   .cmd-row>.divider,.mtx-head .divider{display:none;}
@@ -198,13 +189,20 @@ a.chip{text-decoration:none;}
   .mtx-scroll{-webkit-overflow-scrolling:touch;margin:0 -12px;padding:0 6px;}
   #log{max-height:240px;}
 }
+html.pending body{visibility:hidden;}
+.pagenav-out{margin-left:6px;padding:7px 12px;min-height:0;border:0;border-radius:999px;background:none;
+ color:var(--mt2);font-size:12px;font-weight:500;}
+.pagenav-out:hover:not(:disabled){background:none;color:var(--cr);}
+.vgh-err{margin:12px 0;padding:10px 12px;border:1px solid var(--cr);border-radius:9px;color:var(--cr);font-size:12.5px;}
+@media(max-width:700px){.pagenav-out{flex:none;margin-left:2px;padding:6px 8px;min-height:40px;font-size:12.5px;}}
 </style>
+<script src="/vgh.js"></script>
 </head>
 <body>
 
 <!-- ═══ NAVIGATION ═══ -->
 <nav class="pagenav">
-  <a href="/" class="pagenav-item"><span class="nav-l">Visualisation en direct</span><span class="nav-s">En direct</span></a>
+  <a href="/direct" class="pagenav-item"><span class="nav-l">Visualisation en direct</span><span class="nav-s">En direct</span></a>
   <a href="/historique" class="pagenav-item">Historique</a>
   <a href="/pilotage" class="pagenav-item active">Pilotage</a>
 </nav>
@@ -212,10 +210,10 @@ a.chip{text-decoration:none;}
 <!-- ═══ EN-TÊTE ═══ -->
 <header>
   <div class="brand">
-    <h1>Serre VGH — Pilotage</h1>
+    <h1><span data-gh-name>Serre VGH</span> — Pilotage</h1>
     <p>Commandes en direct, configuration, mise à jour du firmware</p>
   </div>
-  <div class="status" id="status-chips" hidden>
+  <div class="status" id="status-chips">
     <span class="chip"><span class="dot" id="dot-web"></span>Site&nbsp;<strong id="st-web">déconnecté</strong></span>
     <span class="chip"><span class="dot" id="dot-esp"></span>ESP32&nbsp;<strong id="st-esp">inconnu</strong></span>
     <span class="chip">Mode <span id="sysmode" class="badge b-standby">--</span></span>
@@ -223,32 +221,10 @@ a.chip{text-decoration:none;}
   </div>
 </header>
 
-<!-- ═══ VERROU ═══ -->
-<section>
-  <div class="sec-title">Accès pilotage <span class="fill"></span><span class="aside" id="lock-state">verrouillé</span></div>
-
-  <div id="lock-form" class="lock">
-    <div class="ico">&#128274;</div>
-    <p>Le pilotage envoie des commandes en direct à la serre (MQTT) — sans rapport avec la
-       base de données. Protégé par le même jeton que la page Historique
-       (<code>VGH_API_TOKEN</code>), vérifié côté serveur via <code>/api/verify</code>
-       sans toucher à Neon. Mémorisé dans ce navigateur une fois entré.</p>
-    <input id="lock-token" type="password" placeholder="VGH_API_TOKEN" style="width:170px"
-           autocomplete="off" onkeydown="if(event.key==='Enter')tryUnlock()">
-    <button class="btn-ok" id="btn-unlock" onclick="tryUnlock()">Déverrouiller</button>
-  </div>
-  <div id="lock-err" class="lock-err" hidden>Jeton incorrect.</div>
-
-  <div id="lock-open" class="row" hidden>
-    <span style="font-size:12px;color:var(--ok)">&#10003; Déverrouillé sur cet appareil</span>
-    <button onclick="relock()">Reverrouiller</button>
-  </div>
-</section>
-
-<div id="pilotage-body" hidden>
+<div id="pilotage-body">
 
 <!-- ═══ CONNEXION BROKER ═══ -->
-<section>
+<section id="conn" hidden>
   <div class="sec-title">Connexion au broker MQTT <span class="fill"></span><span class="aside">HiveMQ Cloud</span></div>
   <div class="conn-grid">
     <div class="field"><label>Cluster (ex. abc123.s1.eu.hivemq.cloud)</label><input id="c-host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud" value="cf16d20ab8c24da6898f5704c619ae01.s1.eu.hivemq.cloud"></div>
@@ -372,47 +348,6 @@ a.chip{text-decoration:none;}
 const $=id=>document.getElementById(id);
 function log(m){const e=$('log');if(!e)return;const t=new Date().toLocaleTimeString();e.textContent=t+'  '+m+'\n'+e.textContent.slice(0,8000);}
 function set(id,txt,col){const e=$(id);if(!e)return;if(txt!==null&&txt!==undefined)e.textContent=txt;if(col)e.style.color=col;}
-
-/* ════════ VERROU (jeton VGH_API_TOKEN, vérifié via /api/verify) ════════
-   /api/verify ne fait aucune requête Neon — juste une comparaison de jeton
-   côté serveur. Le pilotage n'a rien à voir avec la base de données. */
-async function verifyToken(token){
-  const r=await fetch('/api/verify?token='+encodeURIComponent(token));
-  return r.ok;
-}
-async function tryUnlock(){
-  const token=$('lock-token').value.trim();
-  if(!token)return;
-  $('btn-unlock').disabled=true;
-  try{
-    const ok=await verifyToken(token);
-    $('lock-err').hidden=ok;
-    if(!ok){$('lock-token').value='';return;}
-    localStorage.setItem('vgh-api-token',token);
-    applyLock(true);
-  }catch(e){
-    $('lock-err').hidden=false;$('lock-err').textContent='Erreur réseau : '+e.message;
-  }finally{
-    $('btn-unlock').disabled=false;
-  }
-}
-function relock(){sessionStorage.removeItem('vgh-pilot-open');applyLock(false);}
-function applyLock(open){
-  $('lock-form').hidden=open;
-  $('lock-open').hidden=!open;
-  $('pilotage-body').hidden=!open;
-  $('status-chips').hidden=!open;
-  $('lock-state').textContent=open?'déverrouillé sur cet appareil':'verrouillé';
-  if(open){sessionStorage.setItem('vgh-pilot-open','1');buildSpUI();}
-}
-(async function initLock(){
-  const saved=localStorage.getItem('vgh-api-token');
-  if(!saved)return;
-  $('lock-token').value=saved;
-  try{
-    if(await verifyToken(saved)) applyLock(true);
-  }catch(e){/* hors-ligne : reste verrouillé, l'utilisateur peut réessayer */}
-})();
 
 /* ── Schéma de configuration — CFG_FIELDS de Greenhouse_Final.ino (V8) ──
    Deux familles, volontairement séparées à l'écran :
@@ -734,10 +669,13 @@ function setEsp(state){
   set('st-esp',state==='online'?'en ligne':state==='offline'?'hors ligne':'inconnu');
 }
 function connect(){
-  const host=$('c-host').value.trim(),user=$('c-user').value.trim(),pass=$('c-pass').value;
-  base=$('c-base').value.trim()||'vgh/gh1';
+  /* Identifiants remis par /api/session une fois la serre ouverte ; à défaut
+     (pas encore renseignés côté serveur), ceux du formulaire. */
+  const m=VGH.session&&VGH.session.mqtt;
+  const host=m?m.host:$('c-host').value.trim(),user=m?m.user:$('c-user').value.trim(),pass=m?m.pass:$('c-pass').value;
+  base=m?m.base:($('c-base').value.trim()||'vgh/gh1');
   if(!host){alert('Renseigne l\'URL du cluster HiveMQ.');return;}
-  localStorage.setItem('vgh',JSON.stringify({host,user,base}));
+  if(!m)localStorage.setItem('vgh',JSON.stringify({host,user,base}));
   wantConn=true;
   client=mqtt.connect('wss://'+host+':8884/mqtt',{
     username:user,password:pass,keepalive:30,reconnectPeriod:4000,connectTimeout:10000,
@@ -752,7 +690,7 @@ function connect(){
   });
   client.on('message',onMessage);
   client.on('close',()=>{setWeb(false);if(!wantConn)return;});
-  client.on('error',e=>{log('Erreur MQTT : '+e.message);});
+  client.on('error',e=>{log('Erreur MQTT : '+e.message);set('st-web','refusé');});
 }
 function pub(suffix,payload,qos){ if(client&&client.connected)client.publish(base+'/'+suffix,payload,{qos:qos===undefined?1:qos}); }
 function cmd(o){ pub('cmd',JSON.stringify(o)); log('Commande : '+JSON.stringify(o)); }
@@ -913,9 +851,8 @@ function parseAppDesc(buf){
 
 function uploadFirmware(buf,name,onProgress){
   return new Promise((resolve,reject)=>{
-    const token=localStorage.getItem('vgh-api-token')||'';
     const xhr=new XMLHttpRequest();
-    xhr.open('POST','/api/upload?token='+encodeURIComponent(token)+'&name='+encodeURIComponent(name));
+    xhr.open('POST','/api/upload?name='+encodeURIComponent(name));   // authentifié par le cookie de session
     xhr.setRequestHeader('Content-Type','application/octet-stream');
     xhr.upload.onprogress=(e)=>{ if(e.lengthComputable&&onProgress)onProgress(e.loaded/e.total); };
     xhr.onload=()=>{
@@ -1253,12 +1190,19 @@ function otaEnd(){
 
 /* ════════ INIT ════════ */
 setFwRunning(null);
+buildSpUI();
 try{
   const saved=JSON.parse(localStorage.getItem('vgh')||'{}');
   if(saved.host)$('c-host').value=saved.host;
   if(saved.user)$('c-user').value=saved.user;
   if(saved.base)$('c-base').value=saved.base;
 }catch(e){}
+/* Session ouverte : connexion automatique au broker. Le formulaire ne
+   réapparaît que si le serveur n'a pas les identifiants MQTT de la serre. */
+VGH.ready.then(s=>{
+  if(s.mqtt) connect();
+  else { $('c-base').value=s.base; $('conn').hidden=false; }
+}).catch(()=>{ $('conn').hidden=false; });
 </script>
 </body>
 </html>
